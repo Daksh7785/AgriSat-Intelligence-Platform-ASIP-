@@ -1,0 +1,127 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  labels:
+    app: redis
+spec:
+  ports:
+    - port: 6379
+      targetPort: 6379
+  selector:
+    app: redis
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  labels:
+    app: redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          ports:
+            - containerPort: 6379
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: agrisense-backend
+  labels:
+    app: agrisense-backend
+spec:
+  ports:
+    - port: 8000
+      targetPort: 8000
+  selector:
+    app: agrisense-backend
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agrisense-backend
+  labels:
+    app: agrisense-backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: agrisense-backend
+  template:
+    metadata:
+      labels:
+        app: agrisense-backend
+    spec:
+      containers:
+        - name: backend
+          image: agrisense-backend:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          env:
+            - name: POSTGRES_USER
+              value: "postgres"
+            - name: POSTGRES_PASSWORD
+              value: "postgres"
+            - name: POSTGRES_HOST
+              value: "agrisense-db"
+            - name: POSTGRES_PORT
+              value: "5432"
+            - name: POSTGRES_DB
+              value: "agrisense"
+            - name: REDIS_HOST
+              value: "redis"
+            - name: REDIS_PORT
+              value: "6379"
+            - name: SECRET_KEY
+              value: "agrisense_super_secret_signing_key_2026"
+            - name: DEMO_MODE
+              value: "True"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agrisense-celery-worker
+  labels:
+    app: agrisense-celery-worker
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: agrisense-celery-worker
+  template:
+    metadata:
+      labels:
+        app: agrisense-celery-worker
+    spec:
+      containers:
+        - name: worker
+          image: agrisense-backend:latest
+          command: ["celery", "-A", "app.tasks.celery_app.celery_app", "worker", "--loglevel=info"]
+          env:
+            - name: POSTGRES_USER
+              value: "postgres"
+            - name: POSTGRES_PASSWORD
+              value: "postgres"
+            - name: POSTGRES_HOST
+              value: "agrisense-db"
+            - name: POSTGRES_PORT
+              value: "5432"
+            - name: POSTGRES_DB
+              value: "agrisense"
+            - name: REDIS_HOST
+              value: "redis"
+            - name: REDIS_PORT
+              value: "6379"
+            - name: SECRET_KEY
+              value: "agrisense_super_secret_signing_key_2026"

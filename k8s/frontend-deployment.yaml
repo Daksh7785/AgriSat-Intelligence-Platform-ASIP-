@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: agrisense-frontend
+  labels:
+    app: agrisense-frontend
+spec:
+  ports:
+    - port: 3000
+      targetPort: 3000
+  selector:
+    app: agrisense-frontend
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agrisense-frontend
+  labels:
+    app: agrisense-frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: agrisense-frontend
+  template:
+    metadata:
+      labels:
+        app: agrisense-frontend
+    spec:
+      containers:
+        - name: frontend
+          image: agrisense-frontend:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3000
+          env:
+            - name: NEXT_PUBLIC_API_URL
+              value: "http://agrisense-backend:8000/api/v1"
