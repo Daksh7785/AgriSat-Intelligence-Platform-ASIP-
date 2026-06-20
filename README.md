@@ -1,11 +1,58 @@
-# AgriSense AI Platform
-### Automated Crop Type Classification, Moisture Stress Detection & Precision Irrigation Advisory Platform
+# 🌾 KISAN DRISHTI (किसान दृष्टि) 🛰️
+### AI-Driven Satellite Crop Intelligence & Precision Irrigation Advisory Platform
 
-AgriSense AI is an enterprise-grade geospatial AI intelligence platform designed to ingest optical (Sentinel-2, Landsat-8/9) and microwave SAR (Sentinel-1) satellite observations, compute crop water demand metrics (FAO-56 Chapter 3 Penman-Monteith ET0, crop-coefficient-calibrated depletion values), detect regional moisture stress, classify crop species via an AutoML ensemble, and deliver precision irrigation advisories.
+[![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)]()
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.111.0-009688.svg?style=flat&logo=fastapi&logoColor=white)]()
+[![Next.js](https://img.shields.io/badge/Next.js-15.0-000000.svg?style=flat&logo=nextdotjs&logoColor=white)]()
+[![PostgreSQL](https://img.shields.io/badge/PostGIS-Postgres_15-316192.svg?style=flat&logo=postgresql&logoColor=white)]()
+[![Redis](https://img.shields.io/badge/Redis-Cache-DC382D.svg?style=flat&logo=redis&logoColor=white)]()
+[![Celery](https://img.shields.io/badge/Celery-Worker-37814A.svg?style=flat&logo=celery&logoColor=white)]()
+
+**Kisan Drishti** is an enterprise-grade, nationally scalable geospatial AI platform designed to ingest multi-source optical (Sentinel-2, Landsat-8/9, MODIS) and microwave SAR (Sentinel-1, NISAR ready) satellite observations, detect regional moisture stress, classify crop species via an AutoML ensemble, and deliver precision irrigation advisories.
 
 ---
 
-## 1. System Architecture
+## 🌟 Key Innovations & Hackathon Differentiators
+
+Our platform implements **20 high-fidelity agricultural remote sensing features** grouped into key operational themes:
+
+### 🛡️ Theme A: Trust & Explainability (P0)
+1. **Pixel-Level SHAP Explanations**: Attribution of AutoML classifier predictions to the 70 spectral-temporal features.
+2. **Predictive Entropy Maps**: Visualizes classifier uncertainty zones using information entropy.
+3. **Ensemble Model Disagreement**: Computes cosine similarity variance between Random Forest and XGBoost predictions.
+4. **Causal Gating Explanations**: Suppresses maturity/senescence moisture stress false alarms using temporal VCI and SMI checks.
+
+### ☀️ Theme B: Drought & Climate Intelligence (P1)
+5. **Log-Logistic SPEI**: Standardized Precipitation Evapotranspiration Index calculated via 3-parameter fitting.
+6. **NDVI Anomaly Z-Score Stacks**: Compares current NDVI against multi-year historical pixel statistics.
+7. **Retrospective Lead-Time Scorer**: Validates early-warning lead-times against actual ground truth.
+
+### 💰 Theme C: Economic Translation (P0/P1)
+8. **Ridge Yield Forecaster**: Fuses growing-season cumulative NDVI integrals and GDD (Growing Degree Days).
+9. **ROI Savings Engine**: Computes exact water volume and currency saved compared to traditional flood irrigation.
+10. **Stage-Weighted Loss Estimator**: Fuses crop phenology stages with yield forecasts to output secure, SHA-256 encrypted evidence for PMFBY crop insurance claims.
+
+### 🗺️ Theme D: Spatial Intelligence (P1/P2)
+11. **Sub-Field K-Means Zonation**: Clusters pixel vectors into 2-4 management sub-zones.
+12. **SAR Irrigated Extent Refinement**: Identifies discrepancies between administrative boundaries and actual satellite-detected irrigation boundaries.
+13. **Crop Rotation Streak Tracker**: Identifies historical rotation sequences and fallow intervals.
+
+### 📢 Theme E: Farmer-Facing Accessibility (P1/P2)
+14. **Bilingual TTS Synthesizer**: Hindi/English audio synthesizers powered by `gTTS` for mobile delivery.
+15. **Rain-Aware Advisory Deferral**: Automatically downgrades/defers irrigation depth recommendations based on 3-day rainfall forecasts.
+16. **Active Learning Feedback Loops**: Captures farmer feedback and automatically prioritizes high-disagreement fields for retraining.
+
+### ⚙️ Theme F: Operational Robustness (P0/P1)
+17. **Optical-SAR Fallback Triage**: Automatically switches to radar-only parameters under heavy cloud cover.
+18. **Multi-Satellite Cloud Blending**: Fuses overlapping optical assets using temporal cloud weight profiles.
+19. **Ground Truth Data Provenance**: Displays badge indicators indicating whether metrics are generated against synthetic or real ground truth.
+
+### 🚀 Theme G: Scale & Extensibility (P0/P1/P2)
+20. **NASA ASF DAAC NISAR Connector**: Active Common Metadata Repository (CMR) search queries targeting live L-band HH/HV granules.
+
+---
+
+## 🛠️ System Architecture
 
 ```mermaid
 graph TD
@@ -13,26 +60,27 @@ graph TD
     subgraph Satellites [Satellite Data Sources]
         S1[Sentinel-2 Optical]
         S2[Sentinel-1 SAR]
-        S3[ERA5 Weather Data]
+        S3[NASA ASF DAAC NISAR L-Band]
+        S4[IMD Gridded Weather Data]
     end
 
     %% Ingestion Pipeline
-    subgraph BackendIngestion [Ingestion & Extraction Engine]
-        GEE[Google Earth Engine Ingest]
-        STAC[STAC Catalog Querying]
+    subgraph BackendIngestion [Ingestion & Processing Engine]
         IngService[Ingestion Service]
+        NISARConn[NISAR CMR Connector]
         LeeFilter[Refined Lee Speckle Filter]
-        GLCM[GLCM Texture Engine]
+        Reconciliation[Multi-Sat Cloud Blender]
+        Triage[Optical-SAR Triage Logger]
     end
     
     %% AI/ML Models
     subgraph MLPipeline [AI & Crop Analytics Pipeline]
         AutoML[AutoML Voting Ensemble]
-        TCNN[Temporal CNN]
-        LSTMClassifier[LSTM Sequence Model]
-        DoubleLogistic[Double Logistic Curve Fitter]
-        StressEngine[Moisture Stress Engine]
-        ETCalculator[FAO-56 Water Deficit Engine]
+        SHAPExplainer[Pixel SHAP Explainer]
+        Uncertainty[Entropy & Disagreement Engine]
+        SPEI[Log-Logistic SPEI Engine]
+        YieldModel[Ridge Yield Forecaster]
+        Zonation[Sub-Field K-Means Zonation]
     end
 
     %% Database
@@ -43,137 +91,98 @@ graph TD
 
     %% API Server
     subgraph APIServer [FastAPI Gateway]
-        Routes[FASTAPI APIRouters]
+        Routes[FastAPI APIRouters]
         CopilotNLP[AI Copilot NLP Service]
-        AlertsDispatcher[Alert Dispatcher]
+        FeedbackQueue[Active Learning Queue]
     end
 
     %% Frontend App
     subgraph FrontendApp [Next.js Client]
-        LeafletMap[Leaflet & Vector Layer Map]
-        DigitalTwin[Digital Twin Flow Simulator]
+        LeafletMap[Leaflet GIS Viewport]
+        Provenance[Provenance Badge & Accuracy Card]
         DashboardUI[Analytics Telemetry Panels]
     end
 
     %% Flow Connections
     Satellites --> IngService
-    IngService --> LeeFilter
-    LeeFilter --> GLCM
-    GLCM --> AutoML
-    AutoML --> DoubleLogistic
-    DoubleLogistic --> StressEngine
-    StressEngine --> ETCalculator
-    ETCalculator --> Persistence
+    S3 --> NISARConn
+    NISARConn --> IngService
+    IngService --> Triage
+    Triage --> Reconciliation
+    Reconciliation --> LeeFilter
+    LeeFilter --> AutoML
+    AutoML --> SHAPExplainer
+    AutoML --> Uncertainty
+    AutoML --> YieldModel
+    AutoML --> Zonation
+    SPEI --> Persistence
     Persistence --> Routes
     RedisCache --> Routes
     Routes --> CopilotNLP
-    Routes --> AlertsDispatcher
+    Routes --> FeedbackQueue
     Routes --> FrontendApp
 ```
 
 ---
 
-## 2. Installation Guide
+## 🚀 Installation & Quick Start
 
 ### Prerequisites
-Ensure your local development environment has the following installed:
+Make sure you have the following installed:
 - **Docker** and **Docker Compose**
-- **Node.js 18+** (for running frontend outside Docker)
-- **Python 3.12** (for running backend outside Docker)
+- **Python 3.11+**
+- **Node.js 18+**
 
-### Local Docker Stack Startup
-To boot up the complete environment (PostGIS database, Redis broker, FastAPI application server, Celery worker, Celery beat, and Next.js frontend):
+### Local Docker Stack Boot
+```bash
+# Clone the repository
+git clone https://github.com/Daksh7785/AgriSat-Intelligence-Platform-ASIP-.git
+cd AgriSat-Intelligence-Platform-ASIP-
 
-1. **Clone and navigate to the project directory**:
-   ```bash
-   cd AgriSat-Intelligence-Platform-ASIP-
-   ```
-
-2. **Boot the Docker Compose Services**:
-   ```bash
-   docker-compose up --build -d
-   ```
-
-3. **Verify running containers**:
-   ```bash
-   docker-compose ps
-   ```
-
-4. **Access the Applications**:
-   - **Frontend (Next.js)**: [http://localhost:3000](http://localhost:3000)
-   - **Backend API (FastAPI Docs)**: [http://localhost:8000/docs](http://localhost:8000/docs)
-   - **Database (PostgreSQL/PostGIS)**: Host `localhost`, Port `5432`, Username `postgres`, Password `postgres`.
-
----
-
-## 3. API Documentation Reference
-
-The backend exposes the following API routes at prefix `/api/v1`:
-
-### Authentication (`/auth`)
-* `POST /auth/signup` - Register a new operator user account.
-* `POST /auth/login` - Authenticate credentials and return a JWT bearer token.
-* `GET /auth/me` - Fetch profile metadata of the current active user.
-
-### Ingestion & Processing (`/ingest`, `/features`)
-* `POST /ingest/trigger` - Request asynchronous raster acquisition over a bounding box.
-* `POST /features/extract` - Clip raster bands to field boundaries and calculate zonal indices.
-* `POST /features/phenology/fit` - Curve-fit seasonal NDVI arrays using double logistic functions.
-
-### AI Classification & Stress Engine (`/classification`, `/stress`, `/water`)
-* `POST /classification/predict` - Run AutoML voting classifier to identify field crop types.
-* `GET /classification/history/{field_id}` - Query historical field classifications.
-* `POST /stress/analyze` - Calculate moisture stress level (1 to 5) combining optical, SAR, and thermal anomalies.
-* `GET /stress/reports` - Generate village-level crop health priority reports.
-* `POST /water/deficit` - Compute FAO-56 evapotranspiration ($ET_0, ET_c, ET_a$) and net water requirement.
-
-### Advisories, Copilot, Alerts (`/advisory`, `/copilot`, `/alerts`)
-* `POST /advisory/generate` - Produce stage-based watering advice (depth, volume, water savings).
-* `GET /advisory/list/{field_id}` - Retrieve historic field advisory entries.
-* `POST /copilot/query` - Convert text queries to structured PostGIS SQL & GeoJSON maps.
-* `GET /alerts/list` - Fetch current active system alerts (unread/read).
-* `POST /alerts/read/{alert_id}` - Acknowledge warning message.
-
----
-
-## 4. Production Configuration & Scaling
-
-### Database Tuning (PostGIS/TimescaleDB)
-Add the following options to `postgresql.conf` for optimization with large GIS data layers:
-```ini
-shared_buffers = 4GB                  # 25% of system RAM
-work_mem = 64MB                       # Fast complex joins
-maintenance_work_mem = 512MB          # Fast GIS index generation
-effective_cache_size = 12GB
-random_page_cost = 1.1                # Fast SSD seek simulation
+# Build and start the services in background
+docker-compose up --build -d
 ```
 
-### Redis Caching Policies
-For running the AI Copilot and Dashboard endpoints, configure Redis memory eviction policies in `/etc/redis/redis.conf`:
-```conf
-maxmemory 2gb
-maxmemory-policy allkeys-lru
+### Access Ports
+- 🖥️ **Web Client**: [http://localhost:3000](http://localhost:3000)
+- ⚙️ **API Gateway**: [http://localhost:8000/docs](http://localhost:8000/docs) (Interactive Swagger Docs)
+- 🗄️ **Database (PostGIS)**: `localhost:5432` (User/Password: `postgres`/`postgres`)
+
+---
+
+## 📡 API v1 Endpoint Overview
+
+The platform exposes standard RESTful endpoints under `/api/v1/`:
+
+| Section | Endpoint | Description |
+| :--- | :--- | :--- |
+| **Trust** | `GET /explain/{field_id}/why` | SHAP explainability reports. |
+| | `GET /uncertainty/{command_area}/map` | Entropy and model disagreement layers. |
+| **Climate** | `GET /drought/{command_area}/spei` | Log-Logistic SPEI index values. |
+| **Economic** | `GET /yield/{field_id}/forecast` | Cumulative NDVI + GDD Ridge yield forecasts. |
+| | `GET /roi/{field_id}/season-savings` | Volumetric and cash ROI water savings. |
+| **Spatial** | `GET /zonation/{field_id}/zones` | K-Means sub-field management zones. |
+| | `GET /rotation/{field_id}/history` | Crop rotation sequence tracking. |
+| **Farmers** | `GET /voice/{field_id}/audio` | Bilingual gTTS audio advisory downloads. |
+| | `POST /feedback/submit` | Farmer followed/wrong advisory logging. |
+| | `GET /feedback/review-queue` | Active learning prioritization list. |
+| **Robustness** | `GET /data-quality/{ca}/triage-log` | Cloud-cover triage telemetry. |
+| **Onboarding**| `POST /onboarding/new-command-area` | Onboard and seed a custom command area. |
+
+---
+
+## 🧪 Running Unit Tests
+Validate all 40 core algorithms, services, and endpoints:
+```bash
+# Run pytest
+python -m pytest
 ```
 
 ---
 
-## 5. Monitoring & Logging Stack
-
-- **FastAPI Logs**: Out-of-the-box logs are outputted to standard out via Uvicorn. To forward to files, uvicorn can be started with logging configurations:
-  ```bash
-  uvicorn app.main:app --log-config logging.conf
-  ```
-- **Celery Monitoring**: Inspect celery workers using the flower dashboard:
-  ```bash
-  pip install flower
-  celery -A app.tasks.celery_app.celery_app flower --port=5555
-  ```
-- **Prometheus & Grafana**: Connect Prometheus to the FastAPI gateway metrics exporter (`prometheus-fastapi-instrumentator`) on `/metrics` to log API latency and SQL queries.
-
----
-
-## 6. Hackathon Differentiators
-
-1. **AI Agronomist Agent (Copilot)**: Integrates natural language processing with PostGIS filters to translate unstructured commands (e.g. *"Show stressed wheat fields"*) into map-drawn GeoJSON layers.
-2. **Digital Twin Canal Network**: Model canal junctions as node-edge vectors to dynamically calculate inflow/outflow balances and priority zones.
-3. **Multi-Satellite Fusion Speckle Filtering**: The system utilizes a vectorized Refined Lee Filter to clean SAR backscatter spikes ($VV$ and $VH$), fusing radar returns with optical indices ($NDVI, NDWI$) to provide cloud-free soil moisture estimates ($SMI$) during monsoon seasons.
+## 🌾 PMFBY Insurance Claim Data Integrity
+All stage-weighted yield-loss evaluations automatically generate a secure metadata package containing:
+- **Timestamp**
+- **Field & Crop IDs**
+- **Loss Estimates**
+- **SHA-256 Verification Hash** (used for tamper-proof auditing)
