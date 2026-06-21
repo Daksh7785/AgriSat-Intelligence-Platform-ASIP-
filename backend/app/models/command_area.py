@@ -1,9 +1,9 @@
 from sqlalchemy import Column, String, Float, Integer, Boolean
 from sqlalchemy.orm import relationship
 from geoalchemy2 import Geometry
-from app.models.base import BaseModel
+from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
 
-class CommandArea(BaseModel):
+class CommandArea(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __tablename__ = "command_areas"
 
     name = Column(String(200), nullable=False, index=True)

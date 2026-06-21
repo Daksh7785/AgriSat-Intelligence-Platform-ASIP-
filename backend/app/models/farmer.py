@@ -1,17 +1,17 @@
-from sqlalchemy import Column, String, Boolean
-from sqlalchemy.orm import relationship
-from app.models.base import BaseModel
+"""Farmer records — phone-first identity, no PII beyond what delivery requires."""
+from __future__ import annotations
+from sqlalchemy import String, Boolean
+from sqlalchemy.orm import Mapped, mapped_column
+from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
 
-class Farmer(BaseModel):
+
+class Farmer(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __tablename__ = "farmers"
 
-    name = Column(String(200), nullable=False)
-    phone = Column(String(15), unique=True, nullable=False, index=True)
-    preferred_language = Column(String(20), default="hi") # hi, en, pa, te, ta
-    district = Column(String(100))
-    state = Column(String(100))
-    aadhaar_hash = Column(String(64), nullable=True)
-    whatsapp_opt_in = Column(Boolean, default=False)
-
-    # Relationships
-    fields = relationship("Field", back_populates="farmer")
+    name: Mapped[str] = mapped_column(String(200))
+    phone: Mapped[str] = mapped_column(String(15), index=True)
+    preferred_language: Mapped[str] = mapped_column(String(20), default="hi")
+    district: Mapped[str] = mapped_column(String(100))
+    state: Mapped[str] = mapped_column(String(100))
+    aadhaar_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)  # hashed, never plain
+    whatsapp_opt_in: Mapped[bool] = mapped_column(Boolean, default=False)
