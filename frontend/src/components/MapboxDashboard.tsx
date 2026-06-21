@@ -1,18 +1,45 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
-import { MapContainer, TileLayer, Polygon, Polyline, Popup, useMap } from "react-leaflet";
+import { useEffect, useState } from "react";
+import { MapContainer, TileLayer, Polygon, Polyline, Popup, Marker, useMap, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
-// Helper component to auto-focus map on fields
-function MapController({ bounds }: { bounds: L.LatLngBounds }) {
+// Animated custom marker pin using Tailwind CSS
+const customMarkerIcon = typeof window !== 'undefined' ? L.divIcon({
+  className: 'custom-div-icon',
+  html: `
+    <div class="flex items-center justify-center relative">
+      <span class="absolute inline-flex h-8 w-8 animate-ping rounded-full bg-indigo-500 opacity-60"></span>
+      <div class="relative rounded-full h-4.5 w-4.5 bg-indigo-600 border-2 border-slate-100 flex items-center justify-center shadow-2xl">
+        <div class="h-1.5 w-1.5 bg-white rounded-full"></div>
+      </div>
+    </div>
+  `,
+  iconSize: [32, 32],
+  iconAnchor: [16, 16]
+}) : null;
+
+// Controller for map focus and flight animation
+function MapController({ bounds, center }: { bounds: L.LatLngBounds | null; center: L.LatLngTuple | null }) {
   const map = useMap();
   useEffect(() => {
-    if (bounds) {
+    if (center) {
+      map.flyTo(center, 13, { animate: true, duration: 1.5 });
+    } else if (bounds) {
       map.fitBounds(bounds, { padding: [20, 20] });
     }
-  }, [bounds, map]);
+  }, [bounds, center, map]);
+  return null;
+}
+
+// Click handler inside Leaflet to capture coordinate pin drops
+function MapClickHandler({ onMapClick }: { onMapClick: (lat: number, lon: number) => void }) {
+  useMapEvents({
+    click(e) {
+      onMapClick(e.latlng.lat, e.latlng.lng);
+    }
+  });
   return null;
 }
 
@@ -21,12 +48,15 @@ interface MapboxDashboardProps {
   canalsGeojson: any;
   commandGeojson: any;
   activeLayer: "crops" | "stress" | "moisture";
-  timeStep: number; // 0 to 5 represent temporal indices
+  satelliteOverlay: "none" | "ndvi" | "ndwi" | "sar";
+  timeStep: number;
   selectedFieldId: number | null;
   onSelectField: (id: number) => void;
   onTriggerClassification: (id: number) => void;
   onTriggerAdvisory: (id: number) => void;
   copilotHighlightGeojson: any;
+  onLocationSelected: (info: any) => void;
+  flyToCenter: L.LatLngTuple | null;
 }
 
 export default function MapboxDashboard({
@@ -34,15 +64,21 @@ export default function MapboxDashboard({
   canalsGeojson,
   commandGeojson,
   activeLayer,
+  satelliteOverlay,
   timeStep,
   selectedFieldId,
   onSelectField,
   onTriggerClassification,
   onTriggerAdvisory,
-  copilotHighlightGeojson
+  copilotHighlightGeojson,
+  onLocationSelected,
+  flyToCenter
 }: MapboxDashboardProps) {
   const [mounted, setMounted] = useState(false);
   const [mapBounds, setMapBounds] = useState<L.LatLngBounds | null>(null);
+  const [activePin, setActivePin] = useState<L.LatLngTuple | null>(null);
+  const [loadingLocation, setLoadingLocation] = useState(false);
+  const [resolvedAddress, setResolvedAddress] = useState<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -65,10 +101,61 @@ export default function MapboxDashboard({
     }
   }, [fieldsGeojson]);
 
+  // Handle manual clicks on the map to run reverse geocoding and live weather telemetry
+  const handleMapClick = async (lat: number, lon: number) => {
+    setActivePin([lat, lon]);
+    setLoadingLocation(true);
+    setResolvedAddress("Resolving location details...");
+
+    try {
+      // 1. Nominatim Reverse Geocoding
+      const nominatimUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`;
+      const geoRes = await fetch(nominatimUrl, {
+        headers: { "User-Agent": "AgriSense-GIS-Satellite-Intelligence-v2" }
+      });
+      const geoData = await geoRes.json();
+      const address = geoData.display_name || `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+      setResolvedAddress(address);
+
+      // 2. Open-Meteo Live Weather & Evapotranspiration Forecasts
+      const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&daily=temperature_2m_max,temperature_2m_min,rain_sum,et0_fao_evapotranspiration&timezone=auto`;
+      const weatherRes = await fetch(weatherUrl);
+      const weatherData = await weatherRes.json();
+
+      onLocationSelected({
+        lat,
+        lon,
+        address,
+        addressDetails: geoData.address || {},
+        weather: {
+          temp: weatherData.current_weather?.temperature || 25,
+          windSpeed: weatherData.current_weather?.windspeed || 10,
+          windDirection: weatherData.current_weather?.winddirection || 0,
+          weatherCode: weatherData.current_weather?.weathercode || 0,
+          dailyMaxTemp: weatherData.daily?.temperature_2m_max?.[0] || 28,
+          dailyMinTemp: weatherData.daily?.temperature_2m_min?.[0] || 20,
+          rainSum: weatherData.daily?.rain_sum?.[0] || 0.0,
+          et0: weatherData.daily?.et0_fao_evapotranspiration?.[0] || 4.2
+        }
+      });
+    } catch (e) {
+      console.error("Failed to fetch location details", e);
+      setResolvedAddress("Failed to retrieve location details.");
+      onLocationSelected({
+        lat,
+        lon,
+        address: `${lat.toFixed(4)}, ${lon.toFixed(4)}`,
+        weather: null
+      });
+    } finally {
+      setLoadingLocation(false);
+    }
+  };
+
   if (!mounted) {
     return (
-      <div className="h-[450px] w-full flex items-center justify-center bg-gray-900 border border-gray-800 rounded-lg">
-        <div className="text-gray-400 animate-pulse">Initializing Geospatial Engine...</div>
+      <div className="h-[480px] w-full flex items-center justify-center bg-gray-900 border border-gray-800 rounded-lg">
+        <div className="text-gray-400 animate-pulse text-xs">Initializing Geospatial Engine...</div>
       </div>
     );
   }
@@ -81,8 +168,6 @@ export default function MapboxDashboard({
     let fillColor = "#10B981"; // Default green
     let fillOpacity = 0.5;
     
-    // Simulate temporal variations: Day -10 to Latest
-    // Earlier steps have lower vegetation and less stress. Latest steps show full signatures
     const baseStressScore = feature.properties.stress_score;
     const temporalStressScore = Math.min(1.0, Math.max(0.0, baseStressScore * (timeStep / 5)));
     
@@ -94,7 +179,6 @@ export default function MapboxDashboard({
       else if (crop === "sugarcane") fillColor = "#A7F3D0"; // Soft emerald
       else fillColor = "#78716C"; // Gray/Fallow
     } else if (activeLayer === "stress") {
-      // High stress score maps to red, low to green
       if (temporalStressScore > 0.6) fillColor = "#EF4444"; // Red
       else if (temporalStressScore > 0.4) fillColor = "#F59E0B"; // Orange
       else if (temporalStressScore > 0.2) fillColor = "#FBBF24"; // Yellow
@@ -102,7 +186,6 @@ export default function MapboxDashboard({
       fillOpacity = 0.25 + temporalStressScore * 0.45;
     } else { // Soil Moisture Layer
       const baseSm = feature.properties.soil_moisture;
-      // Over time, soil moisture depletes if stress goes up
       const temporalSm = Math.max(0.1, baseSm - (temporalStressScore * 0.3));
       fillColor = "#3B82F6"; // Blue
       fillOpacity = temporalSm * 0.8;
@@ -120,11 +203,11 @@ export default function MapboxDashboard({
   return (
     <div className="relative w-full h-[480px] rounded-xl overflow-hidden border border-gray-800 glass-panel">
       {/* Map Control overlay for layer info */}
-      <div className="absolute top-3 right-3 z-[1000] flex flex-col gap-1 text-xs bg-slate-900 bg-opacity-90 border border-slate-700 p-2.5 rounded-lg max-w-[200px] text-gray-200">
-        <div className="font-semibold border-b border-gray-700 pb-1 mb-1">Active Visual Layer</div>
-        <div className="flex items-center gap-1.5 capitalize">
+      <div className="absolute top-3 right-3 z-[1000] flex flex-col gap-1.5 text-[11px] bg-slate-950 bg-opacity-95 border border-gray-850 p-3 rounded-lg max-w-[220px] text-gray-200 shadow-2xl">
+        <div className="font-semibold border-b border-gray-800 pb-1 mb-1 text-gray-300">Active Visual Layer</div>
+        <div className="flex items-center gap-1.5 capitalize font-bold">
           <span
-            className="w-2.5 h-2.5 rounded-full"
+            className="w-2 h-2 rounded-full"
             style={{
               backgroundColor:
                 activeLayer === "crops" ? "#FBBF24" : activeLayer === "stress" ? "#EF4444" : "#3B82F6"
@@ -132,12 +215,48 @@ export default function MapboxDashboard({
           />
           {activeLayer} Viewer
         </div>
-        <div className="text-[10px] text-gray-400 mt-1">
+        <div className="text-[10px] text-gray-500 mt-1 leading-relaxed">
           {activeLayer === "crops" && "Golden = Wheat | Emerald = Rice | Cyan = Cotton | Gray = Fallow"}
           {activeLayer === "stress" && "Red = Critical | Orange = Severe | Yellow = Moderate | Green = Safe"}
           {activeLayer === "moisture" && "Opacity indicates soil water content (FAO-56)"}
         </div>
+        
+        {satelliteOverlay !== "none" && (
+          <div className="border-t border-gray-800 pt-2 mt-1.5">
+            <div className="font-semibold text-gray-300 mb-1 capitalize">{satelliteOverlay} Legend</div>
+            {satelliteOverlay === "ndvi" && (
+              <div className="flex flex-col gap-1 text-[10px]">
+                <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-emerald-500 bg-opacity-70"></span> &gt;0.65 (High NDVI/Crop)</div>
+                <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-amber-500 bg-opacity-65"></span> 0.40 - 0.65 (Moderate)</div>
+                <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-red-550 bg-opacity-50"></span> &lt;0.40 (Bare Soil)</div>
+              </div>
+            )}
+            {satelliteOverlay === "ndwi" && (
+              <div className="flex flex-col gap-1 text-[10px]">
+                <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-blue-500 bg-opacity-80"></span> High Moisture/Water</div>
+                <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-blue-550 bg-opacity-40"></span> Low/Dry Soil</div>
+              </div>
+            )}
+            {satelliteOverlay === "sar" && (
+              <div className="flex flex-col gap-1 text-[10px]">
+                <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-indigo-500 bg-opacity-80"></span> Polarized Backscatter</div>
+                <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-indigo-550 bg-opacity-40"></span> Lower Backscatter</div>
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="border-t border-gray-800 pt-1.5 mt-1 text-[9px] text-gray-400">
+          💡 Click anywhere on the map to get live weather & reverse geocoding data.
+        </div>
       </div>
+
+      {loadingLocation && (
+        <div className="absolute top-3 left-3 z-[1000] bg-slate-950 bg-opacity-90 border border-gray-800 rounded-lg py-1.5 px-3 flex items-center gap-2 text-xs text-indigo-400 shadow-xl">
+          <span className="w-2.5 h-2.5 rounded-full border-2 border-indigo-400 border-t-transparent animate-spin"></span>
+          Resolving live GIS details...
+        </div>
+      )}
 
       <MapContainer
         center={[30.08, 75.10]}
@@ -150,6 +269,15 @@ export default function MapboxDashboard({
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
           url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
         />
+
+        {satelliteOverlay !== "none" && (
+          <TileLayer
+            key={`satellite-${satelliteOverlay}`}
+            url={`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1"}/tiles/${satelliteOverlay}/{z}/{x}/{y}`}
+            opacity={0.6}
+            zIndex={100}
+          />
+        )}
 
         {/* 1. Command Area Boundary */}
         {commandGeojson?.features?.map((feat: any, idx: number) => {
@@ -264,8 +392,23 @@ export default function MapboxDashboard({
           return null;
         })}
 
-        {/* Set default map views */}
-        {mapBounds && <MapController bounds={mapBounds} />}
+        {/* Click Marker */}
+        {activePin && customMarkerIcon && (
+          <Marker position={activePin} icon={customMarkerIcon}>
+            <Popup>
+              <div className="text-xs p-1 text-gray-200 max-w-[220px]">
+                <div className="font-bold text-indigo-400 mb-1">Selected Location</div>
+                <div className="text-[11px] leading-relaxed text-gray-300">{resolvedAddress}</div>
+                <div className="text-[10px] text-gray-500 mt-1.5">
+                  Coords: {activePin[0].toFixed(5)}, {activePin[1].toFixed(5)}
+                </div>
+              </div>
+            </Popup>
+          </Marker>
+        )}
+
+        <MapClickHandler onMapClick={handleMapClick} />
+        <MapController bounds={mapBounds} center={flyToCenter} />
       </MapContainer>
     </div>
   );
