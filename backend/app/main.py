@@ -25,7 +25,10 @@ from app.api.v1 import (
     voice_advisory,
     feedback,
     onboarding,
-    data_quality
+    data_quality,
+    tiles,
+    suitability,
+    insurance
 )
 
 app = FastAPI(
@@ -71,6 +74,9 @@ app.include_router(voice_advisory.router, prefix=settings.API_V1_STR)
 app.include_router(feedback.router, prefix=settings.API_V1_STR)
 app.include_router(onboarding.router, prefix=settings.API_V1_STR)
 app.include_router(data_quality.router, prefix=settings.API_V1_STR)
+app.include_router(tiles.router, prefix=settings.API_V1_STR)
+app.include_router(suitability.router, prefix=settings.API_V1_STR)
+app.include_router(insurance.router, prefix=settings.API_V1_STR)
 
 
 @app.on_event("startup")
