@@ -1,6 +1,7 @@
 "use client";
 
-import { CheckCircle2, AlertTriangle, Play, HelpCircle, Save } from "lucide-react";
+import React, { useState } from "react";
+import { CheckCircle2, AlertTriangle, Play, HelpCircle, Save, Volume2 } from "lucide-react";
 
 interface IrrigationAdvisoryProps {
   advisories: any[];
@@ -16,6 +17,41 @@ export default function IrrigationAdvisory({
   loading
 }: IrrigationAdvisoryProps) {
   const latestAdv = advisories && advisories.length > 0 ? advisories[0] : null;
+
+  const [speaking, setSpeaking] = useState(false);
+  const [lang, setLang] = useState<"en" | "hi">("en");
+
+  const handleSpeak = () => {
+    if (typeof window === "undefined" || !window.speechSynthesis) return;
+
+    if (speaking) {
+      window.speechSynthesis.cancel();
+      setSpeaking(false);
+      return;
+    }
+
+    const textToSpeak = lang === "hi" 
+      ? `सिंचाई की सलाह। सिफारिश की गई कार्रवाई: ${
+          latestAdv.recommended_action === "Immediate irrigation" ? "तुरंत सिंचाई करें।" : 
+          latestAdv.recommended_action === "Irrigate in 2 days" ? "दो दिनों में सिंचाई करें।" : 
+          latestAdv.recommended_action === "Irrigate in 5 days" ? "पांच दिनों में सिंचाई करें।" : 
+          "सिंचाई की आवश्यकता नहीं है।"
+        } अनुशंसित गहराई: ${latestAdv.recommended_depth_mm} मिलीमीटर है। विवरण: मिट्टी की नमी का स्तर जांचें।`
+      : `Irrigation advisory. Recommended action is: ${latestAdv.recommended_action}. Recommended depth is ${latestAdv.recommended_depth_mm} millimeters. Details: ${latestAdv.advisory_text}`;
+
+    const utterance = new SpeechSynthesisUtterance(textToSpeak);
+    utterance.lang = lang === "hi" ? "hi-IN" : "en-US";
+    
+    utterance.onend = () => {
+      setSpeaking(false);
+    };
+    utterance.onerror = () => {
+      setSpeaking(false);
+    };
+
+    setSpeaking(true);
+    window.speechSynthesis.speak(utterance);
+  };
 
   return (
     <div className="p-5 rounded-xl border border-gray-800 glass-panel h-full flex flex-col justify-between">
@@ -86,6 +122,32 @@ export default function IrrigationAdvisory({
                       <Save className="w-2.5 h-2.5" /> Savings
                     </div>
                     <div className="text-sm font-black text-emerald-400 mt-0.5">{Math.round(latestAdv.water_savings_m3)} m³</div>
+                  </div>
+                </div>
+
+                {/* Voice Reader controls */}
+                <div className="flex justify-between items-center bg-slate-900 border border-gray-800 rounded px-2.5 py-1 text-xs">
+                  <div className="flex items-center gap-1.5 text-gray-300">
+                    <Volume2 className="w-3.5 h-3.5 text-indigo-400" />
+                    <span className="text-[10px] uppercase font-bold text-gray-400">Audio Advisor</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={lang}
+                      onChange={(e) => setLang(e.target.value as "en" | "hi")}
+                      className="bg-slate-950 border border-gray-800 text-[10px] rounded px-1.5 py-0.5 text-gray-300 focus:outline-none"
+                    >
+                      <option value="en">English</option>
+                      <option value="hi">हिंदी (India)</option>
+                    </select>
+                    <button
+                      onClick={handleSpeak}
+                      className={`text-[10px] font-bold py-0.5 px-2 rounded transition ${
+                        speaking ? "bg-rose-600 hover:bg-rose-700 text-white" : "bg-indigo-600 hover:bg-indigo-700 text-white"
+                      }`}
+                    >
+                      {speaking ? "Stop" : "Listen"}
+                    </button>
                   </div>
                 </div>
 
