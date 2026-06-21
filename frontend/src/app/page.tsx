@@ -2,17 +2,15 @@
 
 import React, { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
-import { 
-  Sparkles, 
-  Map as MapIcon, 
-  Layers, 
-  Play, 
-  Pause, 
-  Calendar, 
-  TrendingUp, 
-  TableProperties, 
-  ShieldAlert, 
-  Info,
+import {
+  Sparkles,
+  Map as MapIcon,
+  Layers,
+  Play,
+  Pause,
+  TrendingUp,
+  TableProperties,
+  ShieldAlert,
   Droplets,
   Activity,
   Award,
@@ -23,7 +21,14 @@ import {
   Thermometer,
   Wind,
   CloudRain,
-  Compass
+  Compass,
+  Satellite,
+  Zap,
+  Globe,
+  Radio,
+  ChevronRight,
+  BarChart3,
+  Cpu,
 } from "lucide-react";
 
 import * as api from "../lib/api";
@@ -35,175 +40,229 @@ import AICopilotPanel from "../components/AICopilotPanel";
 import CropSuitability from "../components/CropSuitability";
 import InsuranceAuditor from "../components/InsuranceAuditor";
 
-// Dynamically load Leaflet Map component to prevent window SSR crashes
-const MapboxDashboard = dynamic(() => import("../components/MapboxDashboard"), { 
-  ssr: false,
-  loading: () => (
-    <div className="h-[480px] w-full flex items-center justify-center bg-slate-950 border border-gray-900 rounded-xl">
-      <div className="text-gray-400 animate-pulse text-xs">Loading Earth Observation Map...</div>
-    </div>
-  )
-});
+const MapboxDashboard = dynamic(
+  () => import("../components/MapboxDashboard"),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-[480px] w-full flex flex-col items-center justify-center gap-4 rounded-xl map-container bg-[var(--bg-surface)]">
+        <div className="relative">
+          <div className="w-12 h-12 rounded-full border-2 border-indigo-500/30 border-t-indigo-400 animate-spin" />
+          <Satellite className="w-5 h-5 text-indigo-400 absolute inset-0 m-auto" />
+        </div>
+        <div className="text-xs text-[var(--text-muted)] font-medium tracking-wide">
+          Initializing Earth Observation Feed...
+        </div>
+      </div>
+    ),
+  }
+);
 
+/* ── Stat Card Helper ─────────────────────────────────────────── */
+interface StatCardProps {
+  label: string;
+  value: string | number;
+  sub: string;
+  icon: React.ReactNode;
+  accentColor: string;
+  glowColor: string;
+  trend?: string;
+}
+
+function StatCard({ label, value, sub, icon, accentColor, glowColor, trend }: StatCardProps) {
+  return (
+    <div className="card-stat p-5">
+      {/* Accent line top */}
+      <div
+        className="absolute top-0 left-6 right-6 h-px opacity-60"
+        style={{ background: `linear-gradient(90deg, transparent, ${accentColor}, transparent)` }}
+      />
+      <div className="flex items-start justify-between">
+        <div className="space-y-1.5 flex-1 min-w-0">
+          <div className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">
+            {label}
+          </div>
+          <div
+            className="text-2xl font-black tracking-tight"
+            style={{ color: accentColor, textShadow: `0 0 20px ${glowColor}` }}
+          >
+            {value}
+          </div>
+          <div className="text-[10px] text-[var(--text-muted)] leading-relaxed truncate">{sub}</div>
+        </div>
+        <div
+          className="ml-3 w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+          style={{ background: `${glowColor}18`, border: `1px solid ${glowColor}30` }}
+        >
+          {icon}
+        </div>
+      </div>
+      {trend && (
+        <div className="mt-3 flex items-center gap-1.5">
+          <TrendingUp className="w-3 h-3 text-emerald-400" />
+          <span className="text-[10px] text-emerald-400 font-semibold">{trend}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Layer Toggle Button ──────────────────────────────────────── */
+interface LayerBtnProps {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  activeClass: string;
+}
+function LayerBtn({ active, onClick, label, activeClass }: LayerBtnProps) {
+  return (
+    <button
+      onClick={onClick}
+      className={`text-[10px] font-bold px-3.5 py-1.5 rounded-lg border transition-all duration-200 ${
+        active ? activeClass : "bg-transparent border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:border-[var(--border-subtle)]"
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
+
+/* ── Panel Section Title ─────────────────────────────────────── */
+function PanelTitle({ icon, title, badge }: { icon: React.ReactNode; title: string; badge?: string }) {
+  return (
+    <div className="flex items-center gap-2.5 mb-1">
+      <div className="flex items-center gap-2">
+        {icon}
+        <h3 className="font-bold text-[var(--text-primary)] text-sm tracking-tight">{title}</h3>
+      </div>
+      {badge && <span className="badge-info">{badge}</span>}
+    </div>
+  );
+}
+
+/* ── Main Page ───────────────────────────────────────────────── */
 export default function DashboardPage() {
-  // Top level GIS states
   const [fieldsGeojson, setFieldsGeojson] = useState<any>(null);
   const [canalsGeojson, setCanalsGeojson] = useState<any>(null);
   const [commandGeojson, setCommandGeojson] = useState<any>(null);
   const [summary, setSummary] = useState<any>(null);
   const [villageReports, setVillageReports] = useState<any[]>([]);
   const [alerts, setAlerts] = useState<any[]>([]);
-  
-  // Selected Context States
+
   const [selectedFieldId, setSelectedFieldId] = useState<number | null>(null);
   const [fieldAdvisories, setFieldAdvisories] = useState<any[]>([]);
-  const [activeLayer, setActiveLayer] = useState<"crops" | "stress" | "moisture" >("crops");
+  const [activeLayer, setActiveLayer] = useState<"crops" | "stress" | "moisture">("crops");
   const [satelliteOverlay, setSatelliteOverlay] = useState<"none" | "ndvi" | "ndwi" | "sar">("none");
-  
-  // Global Geocoding & Weather States
+
   const [activeLocationInfo, setActiveLocationInfo] = useState<any>(null);
   const [flyToCenter, setFlyToCenter] = useState<[number, number] | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchLoading, setSearchLoading] = useState(false);
   const [geminiKey, setGeminiKey] = useState("");
   const [activeSideTab, setActiveSideTab] = useState<"twin" | "location">("twin");
-  
-  // Temporal Playback Slider States
-  const [timeStep, setTimeStep] = useState<number>(5); // 0-5
+
+  const [timeStep, setTimeStep] = useState<number>(5);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
-  
-  // Highlighting states for AI Copilot
   const [copilotHighlight, setCopilotHighlight] = useState<any>(null);
-  
-  // Loading indicators
   const [advLoading, setAdvLoading] = useState<boolean>(false);
   const [classLoading, setClassLoading] = useState<boolean>(false);
 
-  // Load initial telemetry from backend / fallback mock client
   useEffect(() => {
     async function loadData() {
-      const summaryData = await api.getSummary();
-      const fields = await api.getFieldsGeoJSON();
-      const canals = await api.getCanalsGeoJSON();
-      const command = await api.getCommandAreasGeoJSON();
-      const reports = await api.getVillageReports();
-      const alertList = await api.getAlerts();
-
+      const [summaryData, fields, canals, command, reports, alertList] =
+        await Promise.all([
+          api.getSummary(),
+          api.getFieldsGeoJSON(),
+          api.getCanalsGeoJSON(),
+          api.getCommandAreasGeoJSON(),
+          api.getVillageReports(),
+          api.getAlerts(),
+        ]);
       setSummary(summaryData);
       setFieldsGeojson(fields);
       setCanalsGeojson(canals);
       setCommandGeojson(command);
       setVillageReports(reports);
       setAlerts(alertList);
-
-      // Load Gemini key if available
       const savedKey = localStorage.getItem("gemini_api_key");
       if (savedKey) setGeminiKey(savedKey);
     }
     loadData();
   }, []);
 
-  // Sync field-specific advisory history on selection
   useEffect(() => {
     if (selectedFieldId !== null) {
-      const loadFieldAdvisories = async () => {
-        const list = await api.getAdvisories(selectedFieldId);
-        setFieldAdvisories(list);
-      };
-      loadFieldAdvisories();
+      api.getAdvisories(selectedFieldId).then(setFieldAdvisories);
     }
   }, [selectedFieldId]);
 
-  // Handle temporal playback loop
   useEffect(() => {
     let interval: any;
     if (isPlaying) {
-      interval = setInterval(() => {
-        setTimeStep((prev) => (prev + 1) % 6);
-      }, 1500);
+      interval = setInterval(() => setTimeStep((p) => (p + 1) % 6), 1500);
     }
     return () => clearInterval(interval);
   }, [isPlaying]);
 
-  // Global Geocoding search handler (OSM Nominatim API)
   const handleGeocodeSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!searchQuery.trim()) return;
-
     setSearchLoading(true);
     try {
-      const searchUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQuery)}&format=json&limit=1`;
-      const res = await fetch(searchUrl, {
-        headers: { "User-Agent": "AgriSense-GIS-Satellite-Intelligence-v2" }
-      });
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQuery)}&format=json&limit=1`,
+        { headers: { "User-Agent": "AgriSense-GIS-Satellite-Intelligence-v2" } }
+      );
       const data = await res.json();
-
-      if (data && data.length > 0) {
-        const result = data[0];
-        const lat = parseFloat(result.lat);
-        const lon = parseFloat(result.lon);
+      if (data?.length > 0) {
+        const { lat: rawLat, lon: rawLon, display_name } = data[0];
+        const lat = parseFloat(rawLat), lon = parseFloat(rawLon);
         setFlyToCenter([lat, lon]);
-
-        // Automatically trigger weather and reverse geocoding lookup
-        const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&daily=temperature_2m_max,temperature_2m_min,rain_sum,et0_fao_evapotranspiration&timezone=auto`;
-        const weatherRes = await fetch(weatherUrl);
-        const weatherData = await weatherRes.json();
-
-        const locationInfo = {
-          lat,
-          lon,
-          address: result.display_name,
-          addressDetails: {},
+        const wRes = await fetch(
+          `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&daily=temperature_2m_max,temperature_2m_min,rain_sum,et0_fao_evapotranspiration&timezone=auto`
+        );
+        const wData = await wRes.json();
+        setActiveLocationInfo({
+          lat, lon,
+          address: display_name,
           weather: {
-            temp: weatherData.current_weather?.temperature || 25,
-            windSpeed: weatherData.current_weather?.windspeed || 10,
-            windDirection: weatherData.current_weather?.winddirection || 0,
-            weatherCode: weatherData.current_weather?.weathercode || 0,
-            dailyMaxTemp: weatherData.daily?.temperature_2m_max?.[0] || 28,
-            dailyMinTemp: weatherData.daily?.temperature_2m_min?.[0] || 20,
-            rainSum: weatherData.daily?.rain_sum?.[0] || 0.0,
-            et0: weatherData.daily?.et0_fao_evapotranspiration?.[0] || 4.2
-          }
-        };
-
-        setActiveLocationInfo(locationInfo);
+            temp: wData.current_weather?.temperature ?? 25,
+            windSpeed: wData.current_weather?.windspeed ?? 10,
+            windDirection: wData.current_weather?.winddirection ?? 0,
+            weatherCode: wData.current_weather?.weathercode ?? 0,
+            dailyMaxTemp: wData.daily?.temperature_2m_max?.[0] ?? 28,
+            dailyMinTemp: wData.daily?.temperature_2m_min?.[0] ?? 20,
+            rainSum: wData.daily?.rain_sum?.[0] ?? 0,
+            et0: wData.daily?.et0_fao_evapotranspiration?.[0] ?? 4.2,
+          },
+        });
         setActiveSideTab("location");
       } else {
-        alert("Location not found. Try searching for cities, states, or country bounds.");
+        alert("Location not found. Try a city, state, or country name.");
       }
     } catch (err) {
-      console.error("Geocoding failed", err);
+      console.error("Geocoding error", err);
     } finally {
       setSearchLoading(false);
     }
   };
 
-  // Save Gemini Key handler
   const handleSaveGeminiKey = (val: string) => {
     setGeminiKey(val);
     localStorage.setItem("gemini_api_key", val);
   };
 
-  // Handle actions triggered from map popups
   const handleTriggerClassification = async (fieldId: number) => {
     setClassLoading(true);
     const result = await api.triggerClassification(fieldId);
-    
-    setFieldsGeojson((prevGeojson: any) => {
-      if (!prevGeojson) return prevGeojson;
-      const updatedFeatures = prevGeojson.features.map((feat: any) => {
-        if (feat.id === fieldId) {
-          return {
-            ...feat,
-            properties: {
-              ...feat.properties,
-              crop_type: result.crop_type,
-            }
-          };
-        }
-        return feat;
-      });
-      return { ...prevGeojson, features: updatedFeatures };
+    setFieldsGeojson((prev: any) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        features: prev.features.map((f: any) =>
+          f.id === fieldId ? { ...f, properties: { ...f.properties, crop_type: result.crop_type } } : f
+        ),
+      };
     });
     setClassLoading(false);
   };
@@ -211,239 +270,269 @@ export default function DashboardPage() {
   const handleTriggerAdvisory = async (fieldId: number) => {
     setAdvLoading(true);
     const result = await api.triggerAdvisory(fieldId);
-    setFieldAdvisories(prev => [result, ...prev]);
+    setFieldAdvisories((p) => [result, ...p]);
     setAdvLoading(false);
   };
 
   const handleMarkAlertRead = async (alertId: number) => {
     await api.markAlertRead(alertId);
-    setAlerts(prev => prev.filter(a => a.id !== alertId));
+    setAlerts((p) => p.filter((a) => a.id !== alertId));
   };
 
-  // Handle location clicked on Leaflet map
   const handleLocationSelected = (info: any) => {
     setActiveLocationInfo(info);
     setActiveSideTab("location");
   };
 
   const selectedField = fieldsGeojson?.features?.find((f: any) => f.id === selectedFieldId);
-  const stepLabels = ["Day -10", "Day -8", "Day -6", "Day -4", "Day -2", "Latest (Observed)"];
+  const stepLabels = ["Day −10", "Day −8", "Day −6", "Day −4", "Day −2", "Latest"];
+
+  const overlayOptions: Array<{ id: "none" | "ndvi" | "ndwi" | "sar"; label: string; color: string }> = [
+    { id: "none", label: "None", color: "" },
+    { id: "ndvi", label: "NDVI", color: "text-emerald-400 border-emerald-600/50 bg-emerald-900/30" },
+    { id: "ndwi", label: "NDWI", color: "text-sky-400 border-sky-600/50 bg-sky-900/30" },
+    { id: "sar", label: "SAR", color: "text-violet-400 border-violet-600/50 bg-violet-900/30" },
+  ];
 
   return (
-    <div className="min-h-screen bg-darkBg text-gray-200 flex flex-col">
-      {/* Top Banner Navigation */}
-      <header className="border-b border-gray-900 bg-slate-950 bg-opacity-80 backdrop-blur-md sticky top-0 z-[1000] px-6 py-4 flex flex-col md:flex-row md:justify-between md:items-center gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <Droplets className="w-6 h-6 text-indigo-400 animate-bounce" />
-            <h1 className="font-extrabold text-lg tracking-tight text-white">
-              AgriSense AI <span className="text-gray-400 font-normal">Platform</span>
-            </h1>
-            <span className="text-[10px] font-semibold bg-indigo-950 text-indigo-400 px-2 py-0.5 rounded border border-indigo-850 uppercase">
-              v2.0.0 Global
-            </span>
-          </div>
-          <p className="text-xs text-gray-500 mt-1">
-            Global GIS Search, Crop Intelligence, FAO-56 Reference Weather & Gemini AI Copilot
-          </p>
-        </div>
+    <div className="min-h-screen flex flex-col" style={{ background: "var(--bg-base)" }}>
+      {/* ── HEADER ──────────────────────────────────────────────── */}
+      <header className="glass-header sticky top-0 z-[1000] px-6 py-0">
+        <div className="max-w-[1600px] mx-auto w-full">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 py-4">
+            {/* Brand */}
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 flex items-center justify-center shadow-lg"
+                  style={{ boxShadow: "0 0 16px rgba(99,102,241,0.5)" }}>
+                  <Satellite className="w-5 h-5 text-white" />
+                </div>
+                <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-[var(--bg-base)]"
+                  style={{ boxShadow: "0 0 6px rgba(16,185,129,0.8)" }} />
+              </div>
+              <div>
+                <div className="flex items-center gap-2.5">
+                  <h1 className="font-black text-base tracking-tight">
+                    <span className="gradient-text-brand">AgriSense AI</span>
+                    <span className="text-[var(--text-muted)] font-normal ml-1.5">Platform</span>
+                  </h1>
+                  <span className="badge-info">v2 GLOBAL</span>
+                </div>
+                <p className="text-[10px] text-[var(--text-muted)] mt-0.5 hidden sm:block">
+                  Satellite Intelligence · FAO-56 Precision Irrigation · Gemini AI Copilot
+                </p>
+              </div>
+            </div>
 
-        {/* Live Satellite status ticker */}
-        <div className="flex flex-wrap items-center gap-4 text-xs bg-slate-900 border border-gray-800 rounded-lg px-4 py-2">
-          <div className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-            <span className="font-semibold text-gray-450">OSM Geocoder:</span>
-            <span className="text-emerald-400 font-bold">Online</span>
+            {/* Status row */}
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg"
+                style={{ background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.15)" }}>
+                <div className="live-dot" />
+                <span className="text-[10px] font-bold text-emerald-400 tracking-wide">OSM GEOCODER LIVE</span>
+              </div>
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg"
+                style={{ background: "rgba(56,189,248,0.08)", border: "1px solid rgba(56,189,248,0.15)" }}>
+                <Radio className="w-3 h-3 text-sky-400" />
+                <span className="text-[10px] font-bold text-sky-400 tracking-wide">OPEN-METEO SYNC</span>
+              </div>
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg"
+                style={{ background: "rgba(99,102,241,0.08)", border: "1px solid rgba(99,102,241,0.15)" }}>
+                <Cpu className="w-3 h-3 text-indigo-400" />
+                <span className="text-[10px] font-bold text-indigo-400 tracking-wide">AI COPILOT READY</span>
+              </div>
+            </div>
           </div>
-          <div className="h-4 w-px bg-gray-800 hidden sm:block" />
-          <div className="flex items-center gap-1.5">
-            <Activity className="w-4 h-4 text-sky-400" />
-            <span className="font-semibold text-gray-450">Open-Meteo Forecasts:</span>
-            <span className="text-sky-400 font-bold">Synchronized</span>
+
+          {/* Toolbar sub-bar */}
+          <div className="flex flex-col sm:flex-row gap-3 pb-3 pt-0 border-t border-[var(--border-dim)]">
+            <form onSubmit={handleGeocodeSearch} className="relative flex-1 max-w-xl pt-3">
+              <Search className="w-3.5 h-3.5 text-[var(--text-muted)] absolute left-3 top-[22px]" />
+              <input
+                type="text"
+                placeholder="Search any global location, city, country or coordinates..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="input-dark w-full py-2 pl-9 pr-24 text-[12px]"
+              />
+              <button
+                type="submit"
+                disabled={searchLoading}
+                className="btn-primary absolute right-1.5 top-[14px]"
+              >
+                {searchLoading ? (
+                  <span className="flex items-center gap-1">
+                    <span className="w-3 h-3 rounded-full border border-white/40 border-t-white animate-spin" />
+                    Flying
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1">
+                    <Globe className="w-3 h-3" /> Search
+                  </span>
+                )}
+              </button>
+            </form>
+
+            <div className="flex items-center gap-2 max-w-xs pt-3">
+              <div className="flex items-center gap-2 input-dark px-3 py-2 flex-1">
+                <Key className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+                <input
+                  type="password"
+                  placeholder="Gemini API Key (optional)..."
+                  value={geminiKey}
+                  onChange={(e) => handleSaveGeminiKey(e.target.value)}
+                  className="w-full bg-transparent border-none text-[11px] text-[var(--text-secondary)] placeholder:text-[var(--text-muted)] focus:outline-none"
+                />
+              </div>
+            </div>
           </div>
         </div>
       </header>
 
-      {/* Global Toolbar Bar */}
-      <section className="bg-slate-950 border-b border-gray-900 px-6 py-3 flex flex-col sm:flex-row justify-between items-center gap-3">
-        {/* Nominatim Search Input */}
-        <form onSubmit={handleGeocodeSearch} className="relative w-full sm:max-w-md">
-          <input
-            type="text"
-            placeholder="Search global coordinates, cities, or states..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-slate-900 border border-gray-800 rounded-lg py-1.5 pl-9 pr-20 text-xs text-gray-200 placeholder-gray-550 focus:outline-none focus:border-indigo-650 transition"
+      {/* ── MAIN CONTENT ─────────────────────────────────────────── */}
+      <main className="flex-1 px-6 py-6 space-y-6 max-w-[1600px] mx-auto w-full">
+        {/* ── ROW 0: KPI STATS ─────────────────────────────────── */}
+        <section className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+          <StatCard
+            label="Hectares Under Command"
+            value="1,875 ha"
+            sub="Sirhind Command Area Active"
+            icon={<MapIcon className="w-5 h-5 text-indigo-400" />}
+            accentColor="#818CF8"
+            glowColor="#6366F1"
+            trend="+2.3% from last season"
           />
-          <Search className="w-4 h-4 text-gray-500 absolute left-3 top-2" />
-          <button
-            type="submit"
-            disabled={searchLoading}
-            className="absolute right-1.5 top-1 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-800 text-white text-[10px] font-bold py-1 px-3.5 rounded transition"
-          >
-            {searchLoading ? "Flying..." : "Search"}
-          </button>
-        </form>
-
-        {/* Gemini Key Config */}
-        <div className="flex items-center gap-2 w-full sm:max-w-xs bg-slate-900 border border-gray-800 rounded-lg px-2.5 py-1">
-          <Key className="w-4 h-4 text-amber-500 flex-shrink-0" />
-          <input
-            type="password"
-            placeholder="Enter Gemini API Key..."
-            value={geminiKey}
-            onChange={(e) => handleSaveGeminiKey(e.target.value)}
-            className="w-full bg-transparent border-none text-xs text-gray-200 placeholder-gray-500 focus:outline-none"
+          <StatCard
+            label="Avg Water Stress Index"
+            value={summary?.average_stress_score ?? "0.24"}
+            sub="FAO-56 Crop Depletion Score [0–1]"
+            icon={<ShieldAlert className="w-5 h-5 text-rose-400" />}
+            accentColor="#FB7185"
+            glowColor="#F43F5E"
           />
-        </div>
-      </section>
-
-      {/* Main Content Dashboard */}
-      <main className="flex-1 p-6 space-y-6 max-w-7xl mx-auto w-full">
-        {/* Core telemetry cards */}
-        <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="p-4 rounded-xl border border-gray-800 bg-slate-900 bg-opacity-40 flex justify-between items-center relative overflow-hidden">
-            <div>
-              <div className="text-[10px] text-gray-550 uppercase font-bold">Hectares Under Command</div>
-              <div className="text-2xl font-black text-white mt-1">1,875 ha</div>
-              <div className="text-[9px] text-gray-400 mt-0.5">Across Sirhind Command Area</div>
-            </div>
-            <MapIcon className="w-10 h-10 text-gray-700 opacity-20 absolute right-3" />
-          </div>
-
-          <div className="p-4 rounded-xl border border-gray-800 bg-slate-900 bg-opacity-40 flex justify-between items-center relative overflow-hidden">
-            <div>
-              <div className="text-[10px] text-gray-550 uppercase font-bold">Average Water Stress Score</div>
-              <div className="text-2xl font-black text-rose-400 mt-1">
-                {summary ? summary.average_stress_score : "0.24"}
-              </div>
-              <div className="text-[9px] text-gray-400 mt-0.5">Scale [0.0 - 1.0] (FAO-56 Indices)</div>
-            </div>
-            <ShieldAlert className="w-10 h-10 text-gray-700 opacity-20 absolute right-3" />
-          </div>
-
-          <div className="p-4 rounded-xl border border-gray-800 bg-slate-900 bg-opacity-40 flex justify-between items-center relative overflow-hidden">
-            <div>
-              <div className="text-[10px] text-gray-550 uppercase font-bold">Canal Intake Flow</div>
-              <div className="text-2xl font-black text-sky-400 mt-1">
-                {summary ? summary.active_command_canal_flow_cusec : "1250"} Cusec
-              </div>
-              <div className="text-[9px] text-gray-400 mt-0.5">Sirhind feeder distributary</div>
-            </div>
-            <Droplets className="w-10 h-10 text-gray-700 opacity-20 absolute right-3" />
-          </div>
-
-          <div className="p-4 rounded-xl border border-gray-800 bg-slate-900 bg-opacity-40 flex justify-between items-center relative overflow-hidden">
-            <div>
-              <div className="text-[10px] text-gray-550 uppercase font-bold">Estimated Water Saved</div>
-              <div className="text-2xl font-black text-emerald-400 mt-1">
-                {summary ? summary.total_water_saved_m3 : "3840"} m³
-              </div>
-              <div className="text-[9px] text-gray-400 mt-0.5">Via precision irrigation depth advice</div>
-            </div>
-            <Award className="w-10 h-10 text-gray-700 opacity-20 absolute right-3" />
-          </div>
+          <StatCard
+            label="Canal Intake Flow"
+            value={`${summary?.active_command_canal_flow_cusec ?? "1,250"} ℓ/s`}
+            sub="Sirhind Feeder Distributary"
+            icon={<Droplets className="w-5 h-5 text-sky-400" />}
+            accentColor="#38BDF8"
+            glowColor="#0EA5E9"
+            trend="Stable flow detected"
+          />
+          <StatCard
+            label="Precision Water Saved"
+            value={`${summary?.total_water_saved_m3 ?? "3,840"} m³`}
+            sub="Via AI irrigation depth optimization"
+            icon={<Award className="w-5 h-5 text-emerald-400" />}
+            accentColor="#34D399"
+            glowColor="#10B981"
+            trend="↑ 18% vs. baseline"
+          />
         </section>
 
-        {/* Row 1: Geospatial visualizer + Digital Twin side panel */}
-        <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-4">            <div className="p-4 rounded-xl border border-gray-800 bg-slate-900 bg-opacity-20 flex flex-col gap-4">
-              <div className="flex flex-col md:flex-row justify-between md:items-center gap-3">
-                <div className="flex items-center gap-2">
-                  <Layers className="w-4 h-4 text-indigo-400" />
-                  <span className="text-xs font-semibold text-gray-300">Observation Map Control</span>
+        {/* ── ROW 1: MAP + SIDE PANEL ──────────────────────────── */}
+        <section className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          {/* Map column */}
+          <div className="xl:col-span-2 space-y-4">
+            <div className="card-premium p-4 space-y-4">
+              {/* Map controls row 1 */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="section-header">
+                  <Layers className="w-3.5 h-3.5 text-indigo-400" />
+                  Observation Layer Control
                 </div>
-                
-                {/* Visual Layer selectors */}
-                <div className="flex gap-2">
-                  <button
+                <div className="flex gap-2 flex-wrap">
+                  <LayerBtn
+                    active={activeLayer === "crops"}
                     onClick={() => setActiveLayer("crops")}
-                    className={`text-[10px] font-bold px-3 py-1.5 rounded-lg border transition ${
-                      activeLayer === "crops"
-                        ? "bg-amber-600 border-amber-500 text-white"
-                        : "bg-slate-950 border-gray-800 text-gray-400 hover:text-gray-255"
-                    }`}
-                  >
-                    Crop Types Map
-                  </button>
-                  <button
+                    label="🌾 Crop Types"
+                    activeClass="bg-amber-600/25 border-amber-500/60 text-amber-300"
+                  />
+                  <LayerBtn
+                    active={activeLayer === "stress"}
                     onClick={() => setActiveLayer("stress")}
-                    className={`text-[10px] font-bold px-3 py-1.5 rounded-lg border transition ${
-                      activeLayer === "stress"
-                        ? "bg-rose-600 border-rose-500 text-white"
-                        : "bg-slate-950 border-gray-800 text-gray-400 hover:text-gray-255"
-                    }`}
-                  >
-                    Moisture Stress Map
-                  </button>
-                  <button
+                    label="⚠ Moisture Stress"
+                    activeClass="bg-rose-600/25 border-rose-500/60 text-rose-300"
+                  />
+                  <LayerBtn
+                    active={activeLayer === "moisture"}
                     onClick={() => setActiveLayer("moisture")}
-                    className={`text-[10px] font-bold px-3 py-1.5 rounded-lg border transition ${
-                      activeLayer === "moisture"
-                        ? "bg-blue-600 border-blue-500 text-white"
-                        : "bg-slate-950 border-gray-800 text-gray-400 hover:text-gray-255"
-                    }`}
-                  >
-                    Soil Moisture Grid
-                  </button>
+                    label="💧 Soil Moisture"
+                    activeClass="bg-sky-600/25 border-sky-500/60 text-sky-300"
+                  />
                 </div>
               </div>
 
-              {/* Dynamic Satellite Overlay Controls */}
-              <div className="flex flex-col md:flex-row justify-between md:items-center gap-3 border-t border-gray-900 pt-3">
-                <div className="flex items-center gap-2">
-                  <Layers className="w-4 h-4 text-indigo-400 animate-pulse" />
-                  <span className="text-xs font-semibold text-gray-300">Dynamic Satellite Overlay</span>
+              {/* Map controls row 2 — Satellite Overlays */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-[var(--border-dim)]">
+                <div className="section-header">
+                  <Satellite className="w-3.5 h-3.5 text-violet-400 animate-pulse" />
+                  Satellite Spectral Overlay
                 </div>
-                
                 <div className="flex gap-2">
-                  {(["none", "ndvi", "ndwi", "sar"] as const).map((layer) => (
+                  {overlayOptions.map(({ id, label, color }) => (
                     <button
-                      key={layer}
-                      onClick={() => setSatelliteOverlay(layer)}
-                      className={`text-[10px] font-bold px-3 py-1.5 rounded-lg border transition uppercase ${
-                        satelliteOverlay === layer
-                          ? "bg-indigo-650 border-indigo-500 text-white"
-                          : "bg-slate-950 border-gray-800 text-gray-400 hover:text-gray-200"
+                      key={id}
+                      onClick={() => setSatelliteOverlay(id)}
+                      className={`text-[10px] font-bold px-3.5 py-1.5 rounded-lg border transition-all duration-200 ${
+                        satelliteOverlay === id
+                          ? color || "bg-[var(--bg-elevated)] border-[var(--border-subtle)] text-[var(--text-secondary)]"
+                          : "bg-transparent border-[var(--border-dim)] text-[var(--text-muted)] hover:border-[var(--border-subtle)] hover:text-[var(--text-secondary)]"
                       }`}
                     >
-                      {layer === "none" ? "No Overlay" : layer}
+                      {label}
                     </button>
                   ))}
                 </div>
               </div>
 
-              {/* Dynamic Leaflet Geospatial Render */}
-              <MapboxDashboard
-                fieldsGeojson={fieldsGeojson}
-                canalsGeojson={canalsGeojson}
-                commandGeojson={commandGeojson}
-                activeLayer={activeLayer}
-                satelliteOverlay={satelliteOverlay}
-                timeStep={timeStep}
-                selectedFieldId={selectedFieldId}
-                onSelectField={setSelectedFieldId}
-                onTriggerClassification={handleTriggerClassification}
-                onTriggerAdvisory={handleTriggerAdvisory}
-                copilotHighlightGeojson={copilotHighlight}
-                onLocationSelected={handleLocationSelected}
-                flyToCenter={flyToCenter}
-              />
+              {/* The Map */}
+              <div className="map-container">
+                <MapboxDashboard
+                  fieldsGeojson={fieldsGeojson}
+                  canalsGeojson={canalsGeojson}
+                  commandGeojson={commandGeojson}
+                  activeLayer={activeLayer}
+                  satelliteOverlay={satelliteOverlay}
+                  timeStep={timeStep}
+                  selectedFieldId={selectedFieldId}
+                  onSelectField={setSelectedFieldId}
+                  onTriggerClassification={handleTriggerClassification}
+                  onTriggerAdvisory={handleTriggerAdvisory}
+                  copilotHighlightGeojson={copilotHighlight}
+                  onLocationSelected={handleLocationSelected}
+                  flyToCenter={flyToCenter}
+                />
+              </div>
 
-              {/* Temporal Slider Controls (for animated phenology/growth & stress evolution) */}
-              <div className="p-3 bg-slate-950 border border-gray-900 rounded-lg flex items-center gap-4">
+              {/* Temporal Timeline */}
+              <div
+                className="p-3.5 rounded-xl flex items-center gap-4"
+                style={{ background: "var(--bg-surface)", border: "1px solid var(--border-dim)" }}
+              >
                 <button
                   onClick={() => setIsPlaying(!isPlaying)}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white p-2 rounded-lg transition"
-                  title={isPlaying ? "Pause Playback" : "Start Playback"}
+                  className={`p-2.5 rounded-xl transition-all duration-200 flex-shrink-0 ${
+                    isPlaying
+                      ? "bg-rose-600/20 border border-rose-500/40 text-rose-400 hover:bg-rose-600/30"
+                      : "bg-indigo-600/20 border border-indigo-500/40 text-indigo-400 hover:bg-indigo-600/30"
+                  }`}
+                  title={isPlaying ? "Pause Playback" : "Start Temporal Playback"}
                 >
-                  {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 fill-white" />}
+                  {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 fill-current" />}
                 </button>
-                
-                <div className="flex-1 flex flex-col gap-1.5">
-                  <div className="flex justify-between text-[10px] text-gray-500 font-semibold uppercase">
-                    <span>Temporal Composite Timeline</span>
-                    <span className="text-indigo-400 font-bold">{stepLabels[timeStep]}</span>
+
+                <div className="flex-1 space-y-1.5">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">
+                      Temporal Composite Timeline
+                    </span>
+                    <span
+                      className="text-[11px] font-black text-indigo-400"
+                      style={{ textShadow: "0 0 12px rgba(99,102,241,0.6)" }}
+                    >
+                      {stepLabels[timeStep]}
+                    </span>
                   </div>
                   <input
                     type="range"
@@ -451,118 +540,168 @@ export default function DashboardPage() {
                     max="5"
                     value={timeStep}
                     onChange={(e) => setTimeStep(parseInt(e.target.value))}
-                    className="w-full accent-indigo-500 bg-slate-900 h-1.5 rounded-lg appearance-none cursor-pointer"
+                    className="w-full"
+                    style={{ accentColor: "#6366F1" }}
                   />
-                  <div className="flex justify-between text-[9px] text-gray-600">
-                    <span>Day -10 (Sowing)</span>
-                    <span>Day -8</span>
-                    <span>Day -6 (Emergence)</span>
-                    <span>Day -4</span>
-                    <span>Day -2 (Vegetative)</span>
-                    <span>Latest Observed</span>
+                  <div className="flex justify-between text-[9px] text-[var(--text-muted)] font-medium">
+                    <span>Sowing</span>
+                    <span>Emergence</span>
+                    <span>Vegetative</span>
+                    <span>Latest</span>
                   </div>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Side Panel: Digital Twin / Location Weather Metrics */}
-          <div className="h-full flex flex-col gap-4">
-            {/* Tab Controllers */}
-            <div className="flex border border-gray-800 rounded-lg bg-slate-950 p-1">
+          {/* Side Panel */}
+          <div className="flex flex-col gap-4">
+            {/* Tab controller */}
+            <div className="tab-bar">
               <button
+                className={`tab-btn ${activeSideTab === "twin" ? "active" : ""}`}
                 onClick={() => setActiveSideTab("twin")}
-                className={`flex-1 text-[11px] font-bold py-1.5 rounded-md transition ${
-                  activeSideTab === "twin"
-                    ? "bg-slate-800 text-white"
-                    : "text-gray-450 hover:text-gray-200"
-                }`}
               >
-                Distributary Twin
+                <div className="flex items-center justify-center gap-1.5">
+                  <Activity className="w-3.5 h-3.5" />
+                  Canal Twin
+                </div>
               </button>
               <button
+                className={`tab-btn ${activeSideTab === "location" ? "active" : ""}`}
                 onClick={() => setActiveSideTab("location")}
-                className={`flex-1 text-[11px] font-bold py-1.5 rounded-md transition ${
-                  activeSideTab === "location"
-                    ? "bg-slate-800 text-white"
-                    : "text-gray-455 hover:text-gray-200"
-                }`}
               >
-                Weather Analysis
+                <div className="flex items-center justify-center gap-1.5">
+                  <CloudSun className="w-3.5 h-3.5" />
+                  Weather
+                  {activeLocationInfo && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 ml-0.5" />
+                  )}
+                </div>
               </button>
             </div>
 
+            {/* Tab content */}
             {activeSideTab === "twin" ? (
               <CanalCommandTwin summary={summary} fieldsGeojson={fieldsGeojson} />
             ) : (
-              <div className="p-5 rounded-xl border border-gray-850 bg-slate-900 bg-opacity-40 flex-1 flex flex-col justify-between min-h-[300px]">
+              <div className="card-premium p-5 flex-1 flex flex-col min-h-[320px]">
                 {!activeLocationInfo ? (
-                  <div className="flex flex-col items-center justify-center text-center py-20 text-gray-500 gap-2">
-                    <MapPin className="w-10 h-10 text-gray-650 animate-bounce" />
-                    <div className="text-xs font-semibold">No location selected</div>
-                    <div className="text-[10px]">Click anywhere on the map to query weather patterns.</div>
+                  <div className="flex flex-col items-center justify-center flex-1 text-center gap-3 py-12">
+                    <div
+                      className="w-14 h-14 rounded-2xl flex items-center justify-center"
+                      style={{ background: "rgba(99,102,241,0.08)", border: "1px solid rgba(99,102,241,0.15)" }}
+                    >
+                      <MapPin className="w-7 h-7 text-indigo-400/60" />
+                    </div>
+                    <div>
+                      <div className="text-sm font-bold text-[var(--text-secondary)] mb-1">
+                        No location selected
+                      </div>
+                      <div className="text-[11px] text-[var(--text-muted)] max-w-[200px] leading-relaxed mx-auto">
+                        Click anywhere on the map or use the search bar to load live weather data.
+                      </div>
+                    </div>
                   </div>
                 ) : (
-                  <div className="space-y-4">
-                    <div className="border-b border-gray-800 pb-3">
-                      <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-400">
-                        <MapPin className="w-4 h-4" />
-                        Selected Area Details
+                  <div className="space-y-4 animate-slide-up">
+                    {/* Location header */}
+                    <div>
+                      <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-indigo-400 mb-2">
+                        <MapPin className="w-3.5 h-3.5" />
+                        Selected Location
                       </div>
-                      <div className="text-[11px] text-gray-300 mt-1 leading-relaxed">
+                      <div className="text-[12px] text-[var(--text-secondary)] leading-relaxed line-clamp-2">
                         {activeLocationInfo.address}
                       </div>
-                      <div className="text-[9px] text-gray-500 mt-1 font-mono">
-                        Latitude: {activeLocationInfo.lat.toFixed(5)}, Longitude: {activeLocationInfo.lon.toFixed(5)}
+                      <div className="font-mono text-[10px] text-[var(--text-muted)] mt-1">
+                        {activeLocationInfo.lat.toFixed(5)}°N, {activeLocationInfo.lon.toFixed(5)}°E
                       </div>
                     </div>
 
-                    {activeLocationInfo.weather ? (
-                      <div className="space-y-3">
-                        <div className="text-[10px] uppercase font-bold text-gray-450">Live Meteorology</div>
-                        
-                        <div className="grid grid-cols-2 gap-2 text-xs">
-                          <div className="p-2.5 rounded bg-slate-950 border border-gray-850 flex items-center gap-2">
-                            <Thermometer className="w-4 h-4 text-rose-455" />
+                    {/* Weather metrics */}
+                    {activeLocationInfo.weather && (
+                      <>
+                        <div className="section-header">
+                          <CloudSun className="w-3 h-3" />
+                          Live Meteorology
+                        </div>
+                        <div className="grid grid-cols-2 gap-2.5">
+                          <div className="metric-mini">
+                            <div
+                              className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                              style={{ background: "rgba(244,63,94,0.1)", border: "1px solid rgba(244,63,94,0.2)" }}
+                            >
+                              <Thermometer className="w-4 h-4 text-rose-400" />
+                            </div>
                             <div>
-                              <div className="text-[9px] text-gray-500">Temperature</div>
-                              <div className="font-bold text-gray-200">{activeLocationInfo.weather.temp}°C</div>
+                              <div className="text-[9px] text-[var(--text-muted)] font-semibold">TEMPERATURE</div>
+                              <div className="text-[13px] font-black text-[var(--text-primary)]">
+                                {activeLocationInfo.weather.temp}°C
+                              </div>
                             </div>
                           </div>
-
-                          <div className="p-2.5 rounded bg-slate-950 border border-gray-850 flex items-center gap-2">
-                            <Wind className="w-4 h-4 text-sky-400" />
+                          <div className="metric-mini">
+                            <div
+                              className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                              style={{ background: "rgba(56,189,248,0.1)", border: "1px solid rgba(56,189,248,0.2)" }}
+                            >
+                              <Wind className="w-4 h-4 text-sky-400" />
+                            </div>
                             <div>
-                              <div className="text-[9px] text-gray-500">Wind Speed</div>
-                              <div className="font-bold text-gray-200">{activeLocationInfo.weather.windSpeed} km/h</div>
+                              <div className="text-[9px] text-[var(--text-muted)] font-semibold">WIND</div>
+                              <div className="text-[13px] font-black text-[var(--text-primary)]">
+                                {activeLocationInfo.weather.windSpeed} km/h
+                              </div>
                             </div>
                           </div>
-
-                          <div className="p-2.5 rounded bg-slate-950 border border-gray-850 flex items-center gap-2">
-                            <CloudRain className="w-4 h-4 text-blue-400" />
+                          <div className="metric-mini">
+                            <div
+                              className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                              style={{ background: "rgba(99,102,241,0.1)", border: "1px solid rgba(99,102,241,0.2)" }}
+                            >
+                              <CloudRain className="w-4 h-4 text-indigo-400" />
+                            </div>
                             <div>
-                              <div className="text-[9px] text-gray-500">Expected Rain</div>
-                              <div className="font-bold text-gray-200">{activeLocationInfo.weather.rainSum} mm</div>
+                              <div className="text-[9px] text-[var(--text-muted)] font-semibold">RAIN SUM</div>
+                              <div className="text-[13px] font-black text-[var(--text-primary)]">
+                                {activeLocationInfo.weather.rainSum} mm
+                              </div>
                             </div>
                           </div>
-
-                          <div className="p-2.5 rounded bg-slate-950 border border-gray-850 flex items-center gap-2">
-                            <Compass className="w-4 h-4 text-emerald-400" />
+                          <div className="metric-mini">
+                            <div
+                              className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                              style={{ background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.2)" }}
+                            >
+                              <Compass className="w-4 h-4 text-emerald-400" />
+                            </div>
                             <div>
-                              <div className="text-[9px] text-gray-500">Reference ET0</div>
-                              <div className="font-bold text-gray-200">{activeLocationInfo.weather.et0} mm/day</div>
+                              <div className="text-[9px] text-[var(--text-muted)] font-semibold">REF ET0</div>
+                              <div className="text-[13px] font-black text-[var(--text-primary)]">
+                                {activeLocationInfo.weather.et0} mm/d
+                              </div>
                             </div>
                           </div>
                         </div>
 
-                        <div className="p-3 rounded bg-indigo-950 bg-opacity-20 border border-indigo-900 text-[10px] text-indigo-300 leading-relaxed">
-                          📌 **Evapotranspiration Factor:** Reference evapotranspiration (ET0) is estimated at **{activeLocationInfo.weather.et0} mm/day** based on real-time solar radiation and thermal calculations. You can query the Copilot to analyze precision irrigation scheduling for this exact climate.
+                        {/* ET0 advisory callout */}
+                        <div
+                          className="p-3 rounded-xl text-[11px] leading-relaxed text-indigo-300"
+                          style={{
+                            background: "rgba(99,102,241,0.07)",
+                            border: "1px solid rgba(99,102,241,0.2)",
+                          }}
+                        >
+                          <div className="flex items-start gap-2">
+                            <Zap className="w-3.5 h-3.5 text-indigo-400 mt-0.5 flex-shrink-0" />
+                            <span>
+                              Reference ET₀ is <b className="text-indigo-200">{activeLocationInfo.weather.et0} mm/day</b>. 
+                              Query the AI Copilot below for precision irrigation scheduling at this location.
+                            </span>
+                          </div>
                         </div>
-                      </div>
-                    ) : (
-                      <div className="text-xs text-rose-400 bg-rose-950 bg-opacity-20 p-3 rounded border border-rose-900">
-                        Could not resolve weather forecasts for these coordinates.
-                      </div>
+                      </>
                     )}
                   </div>
                 )}
@@ -571,68 +710,76 @@ export default function DashboardPage() {
           </div>
         </section>
 
-        {/* Row 2: Precision Advisory + Crop Forecasting + AI Copilot chat */}
+        {/* ── ROW 2: ADVISORY + CHARTS + COPILOT ───────────────── */}
         <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div>
-            <IrrigationAdvisory
-              advisories={fieldAdvisories}
-              selectedField={selectedField}
-              onTriggerAdvisory={handleTriggerAdvisory}
-              loading={advLoading}
-            />
-          </div>
-
-          <div>
-            <PredictiveCharts selectedField={selectedField} />
-          </div>
-
-          <div>
-            <AICopilotPanel 
-              onCopilotHighlight={setCopilotHighlight} 
-              activeLocationInfo={activeLocationInfo}
-            />
-          </div>
+          <IrrigationAdvisory
+            advisories={fieldAdvisories}
+            selectedField={selectedField}
+            onTriggerAdvisory={handleTriggerAdvisory}
+            loading={advLoading}
+          />
+          <PredictiveCharts selectedField={selectedField} />
+          <AICopilotPanel
+            onCopilotHighlight={setCopilotHighlight}
+            activeLocationInfo={activeLocationInfo}
+          />
         </section>
 
-        {/* Row 3: Admin Village reports & Alert trigger panel */}
-        <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Village reports */}
-          <div className="lg:col-span-2 p-5 rounded-xl border border-gray-800 glass-panel">
-            <h3 className="font-bold text-gray-100 flex items-center gap-2 mb-4">
-              <TableProperties className="w-5 h-5 text-gray-400" />
-              Village moisture stress index summary
-            </h3>
-
-            <div className="overflow-x-auto text-xs">
-              <table className="min-w-full divide-y divide-gray-850">
+        {/* ── ROW 3: VILLAGE TABLE + ALERTS ────────────────────── */}
+        <section className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          {/* Village reports table */}
+          <div className="xl:col-span-2 card-premium p-5">
+            <PanelTitle
+              icon={<TableProperties className="w-4.5 h-4.5 text-indigo-400" />}
+              title="Village Moisture Stress Index"
+              badge={`${villageReports.length} Villages`}
+            />
+            <p className="text-[10px] text-[var(--text-muted)] mb-4">
+              Real-time FAO-56 crop depletion aggregates by village command unit
+            </p>
+            <div className="overflow-x-auto">
+              <table className="data-table">
                 <thead>
-                  <tr className="text-gray-400 font-bold border-b border-gray-800">
-                    <th className="pb-2 text-left">Village</th>
-                    <th className="pb-2 text-left">District</th>
-                    <th className="pb-2 text-center">Total Plots</th>
-                    <th className="pb-2 text-center">Stressed Plots</th>
-                    <th className="pb-2 text-center">% Stressed</th>
-                    <th className="pb-2 text-center">Avg Stress Score</th>
-                    <th className="pb-2 text-center">Priority</th>
+                  <tr>
+                    <th>Village</th>
+                    <th>District</th>
+                    <th className="text-center">Total Plots</th>
+                    <th className="text-center">Stressed</th>
+                    <th className="text-center">% Stress</th>
+                    <th className="text-center">Avg Score</th>
+                    <th className="text-center">Priority</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-900 text-gray-300">
+                <tbody>
                   {villageReports.map((item, idx) => (
-                    <tr key={idx} className="hover:bg-slate-900 hover:bg-opacity-25 transition">
-                      <td className="py-2.5 font-semibold text-gray-200">{item.village}</td>
-                      <td className="py-2.5 text-gray-400">{item.district}</td>
-                      <td className="py-2.5 text-center">{item.total_fields}</td>
-                      <td className="py-2.5 text-center text-rose-400">{item.stressed_fields}</td>
-                      <td className="py-2.5 text-center font-bold text-rose-300">{item.pct_stressed.toFixed(0)}%</td>
-                      <td className="py-2.5 text-center">{item.average_stress_score.toFixed(2)}</td>
-                      <td className="py-2.5 text-center">
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                          item.advisory_priority === "High"
-                            ? "bg-rose-950 text-rose-400 border border-rose-800"
-                            : item.advisory_priority === "Medium"
-                            ? "bg-amber-950 text-amber-400 border border-amber-800"
-                            : "bg-emerald-950 text-emerald-400 border border-emerald-800"
-                        }`}>
+                    <tr key={idx}>
+                      <td className="font-semibold text-[var(--text-primary)]">{item.village}</td>
+                      <td>{item.district}</td>
+                      <td className="text-center">{item.total_fields}</td>
+                      <td className="text-center text-rose-400 font-bold">{item.stressed_fields}</td>
+                      <td className="text-center font-bold text-rose-300">{item.pct_stressed.toFixed(0)}%</td>
+                      <td className="text-center font-mono text-[var(--text-secondary)]">
+                        {item.average_stress_score.toFixed(2)}
+                      </td>
+                      <td className="text-center">
+                        <span
+                          className={`chip font-bold ${
+                            item.advisory_priority === "High"
+                              ? "bg-rose-900/40 text-rose-300 border border-rose-700/50"
+                              : item.advisory_priority === "Medium"
+                              ? "bg-amber-900/40 text-amber-300 border border-amber-700/50"
+                              : "bg-emerald-900/40 text-emerald-300 border border-emerald-700/50"
+                          }`}
+                        >
+                          <span
+                            className={`w-1.5 h-1.5 rounded-full ${
+                              item.advisory_priority === "High"
+                                ? "bg-rose-400"
+                                : item.advisory_priority === "Medium"
+                                ? "bg-amber-400"
+                                : "bg-emerald-400"
+                            }`}
+                          />
                           {item.advisory_priority}
                         </span>
                       </td>
@@ -640,25 +787,43 @@ export default function DashboardPage() {
                   ))}
                 </tbody>
               </table>
+              {villageReports.length === 0 && (
+                <div className="py-12 text-center text-[var(--text-muted)] text-xs">
+                  Loading village stress reports from backend...
+                </div>
+              )}
             </div>
           </div>
 
           {/* Alert Manager */}
-          <div>
-            <AlertManager alerts={alerts} onMarkRead={handleMarkAlertRead} />
-          </div>
+          <AlertManager alerts={alerts} onMarkRead={handleMarkAlertRead} />
         </section>
 
-        {/* Row 4: Crop Suitability & Claims Evidence Auditor */}
+        {/* ── ROW 4: CROP SUITABILITY + INSURANCE AUDITOR ──────── */}
         <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <CropSuitability locationInfo={activeLocationInfo} />
           <InsuranceAuditor selectedField={selectedField} />
         </section>
       </main>
 
-      {/* Footer Info */}
-      <footer className="border-t border-gray-950 bg-slate-950 py-4.5 px-6 text-center text-[10px] text-gray-600 mt-auto">
-        &copy; {new Date().getFullYear()} AgriSense AI Systems. All rights reserved. Powered by Google DeepMind Advanced Agentic Coding.
+      {/* ── FOOTER ─────────────────────────────────────────────── */}
+      <footer
+        className="mt-auto py-5 px-6 text-center"
+        style={{ borderTop: "1px solid var(--border-dim)", background: "var(--bg-void)" }}
+      >
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-2 text-[10px] text-[var(--text-muted)]">
+          <span className="flex items-center gap-1.5">
+            <Satellite className="w-3 h-3 text-indigo-400/50" />
+            <span className="gradient-text-brand font-bold">AgriSense AI Systems</span>
+          </span>
+          <span className="hidden sm:block">·</span>
+          <span>© {new Date().getFullYear()} All rights reserved</span>
+          <span className="hidden sm:block">·</span>
+          <span className="flex items-center gap-1">
+            <Sparkles className="w-3 h-3 text-violet-400/50" />
+            Powered by Google DeepMind Advanced Agentic Coding
+          </span>
+        </div>
       </footer>
     </div>
   );

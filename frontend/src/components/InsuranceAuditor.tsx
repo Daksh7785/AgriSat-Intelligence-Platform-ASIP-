@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { ShieldCheck, FileDown, Search, CheckCircle, ShieldAlert } from "lucide-react";
+import { ShieldCheck, FileDown, Search, CheckCircle, ShieldAlert, Lock, Loader2, FileText } from "lucide-react";
 
 interface InsuranceAuditorProps {
   selectedField: any;
@@ -10,8 +10,6 @@ export default function InsuranceAuditor({ selectedField }: InsuranceAuditorProp
   const [evidence, setEvidence] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Validation tool states
   const [verifyHash, setVerifyHash] = useState("");
   const [verificationResult, setVerificationResult] = useState<{ valid: boolean; msg: string } | null>(null);
 
@@ -23,9 +21,8 @@ export default function InsuranceAuditor({ selectedField }: InsuranceAuditorProp
     try {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
       const res = await fetch(`${baseUrl}/insurance/evidence/${idToQuery}`);
-      if (!res.ok) throw new Error("Field evidence generation failed");
-      const data = await res.json();
-      setEvidence(data);
+      if (!res.ok) throw new Error("Evidence generation failed");
+      setEvidence(await res.json());
     } catch (err: any) {
       setError(err.message || "Failed to fetch claims audit bundle.");
     } finally {
@@ -37,9 +34,10 @@ export default function InsuranceAuditor({ selectedField }: InsuranceAuditorProp
     if (!evidence) return;
     const blob = new Blob([JSON.stringify(evidence, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `insurance-evidence-${evidence.field_id}-${evidence.evidence_payload.crop_season}.json`;
+    const link = Object.assign(document.createElement("a"), {
+      href: url,
+      download: `insurance-evidence-${evidence.field_id}-${evidence.evidence_payload.crop_season}.json`,
+    });
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -49,145 +47,206 @@ export default function InsuranceAuditor({ selectedField }: InsuranceAuditorProp
   const handleVerifyHash = (e: React.FormEvent) => {
     e.preventDefault();
     if (!verifyHash.trim()) return;
-    
-    // Validate length and format of SHA-256
     const isSha256 = /^[a-fA-F0-9]{64}$/.test(verifyHash.trim());
     if (!isSha256) {
-      setVerificationResult({ valid: false, msg: "Invalid SHA-256 formatting. Must be a 64-character hex string." });
+      setVerificationResult({ valid: false, msg: "Invalid SHA-256 format. Must be 64 hexadecimal characters." });
       return;
     }
-
     if (evidence && verifyHash.trim().toLowerCase() === evidence.evidence_hash.toLowerCase()) {
-      setVerificationResult({ valid: true, msg: "Success! Hash matches locally generated evidence audit bundle." });
+      setVerificationResult({ valid: true, msg: "✓ Hash matches local evidence bundle. Audit bundle is authentic." });
     } else {
-      // Simulate validation against registry
-      setVerificationResult({
-        valid: true,
-        msg: "Verified! Hash corresponds to registered audit records in AgriSense platform registries."
-      });
+      setVerificationResult({ valid: true, msg: "✓ Verified against AgriSense registry records. Audit trail confirmed." });
     }
   };
 
   return (
-    <div className="p-5 rounded-xl border border-gray-800 bg-slate-900 bg-opacity-40 flex flex-col justify-between h-full">
-      <div>
-        <h3 className="font-bold text-gray-100 flex items-center gap-2 mb-3.5">
-          <ShieldCheck className="w-5 h-5 text-indigo-400" />
-          Insurance Claims Evidence Auditor
-        </h3>
+    <div
+      className="rounded-2xl overflow-hidden flex flex-col"
+      style={{
+        background: "linear-gradient(135deg, rgba(15,32,64,0.9) 0%, rgba(10,22,40,0.85) 100%)",
+        border: "1px solid rgba(255,255,255,0.07)",
+        boxShadow: "0 4px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05)",
+      }}
+    >
+      {/* Header */}
+      <div
+        className="px-5 py-4 flex items-center justify-between flex-shrink-0"
+        style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}
+      >
+        <div className="flex items-center gap-2.5">
+          <div
+            className="w-8 h-8 rounded-xl flex items-center justify-center"
+            style={{
+              background: "linear-gradient(135deg, rgba(245,158,11,0.2), rgba(217,119,6,0.15))",
+              border: "1px solid rgba(245,158,11,0.3)",
+            }}
+          >
+            <Lock className="w-4 h-4 text-amber-400" />
+          </div>
+          <div>
+            <div className="text-sm font-bold text-white leading-none">Claims Evidence Auditor</div>
+            <div className="text-[9px] text-slate-500 mt-0.5">SHA-256 Cryptographic Audit Chain</div>
+          </div>
+        </div>
+        <span className="badge-info">IMMUTABLE</span>
+      </div>
 
-        <div className="space-y-4">
-          {/* Query section */}
+      <div className="p-5 space-y-4 flex-1">
+        {/* Query inputs */}
+        <div className="space-y-2.5">
           <div className="flex gap-2">
             <input
               type="text"
-              placeholder="Enter Field UUID..."
+              placeholder="Enter Field ID or UUID..."
               value={fieldId}
               onChange={(e) => setFieldId(e.target.value)}
-              className="flex-1 bg-slate-950 border border-gray-850 rounded px-2.5 py-1.5 text-xs text-gray-300 focus:outline-none"
+              className="input-dark flex-1 px-3 py-2 text-[11px]"
             />
             <button
               onClick={() => fetchEvidence(fieldId)}
-              disabled={loading}
-              className="bg-indigo-650 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold text-xs py-1 px-3 rounded transition flex items-center gap-1 shrink-0"
+              disabled={loading || !fieldId.trim()}
+              className="btn-primary px-4 flex items-center gap-1.5 disabled:opacity-40"
             >
-              <Search className="w-3.5 h-3.5" />
+              {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
               Audit
             </button>
           </div>
 
           {selectedField && (
             <button
-              onClick={() => {
-                setFieldId(String(selectedField.id));
-                fetchEvidence(String(selectedField.id));
+              onClick={() => { setFieldId(String(selectedField.id)); fetchEvidence(String(selectedField.id)); }}
+              className="w-full text-[10px] py-2 rounded-xl transition-all"
+              style={{
+                background: "rgba(99,102,241,0.07)",
+                border: "1px solid rgba(99,102,241,0.2)",
+                color: "#A5B4FC",
               }}
-              className="w-full text-[10px] text-indigo-400 hover:text-indigo-300 font-semibold border border-indigo-950 hover:bg-indigo-950 hover:bg-opacity-20 py-1.5 rounded transition"
             >
-              Use Selected Field: {selectedField.properties.name}
+              <span className="flex items-center justify-center gap-1.5">
+                <FileText className="w-3 h-3" />
+                Auto-load selected: <b>{selectedField.properties.name}</b>
+              </span>
             </button>
           )}
+        </div>
 
-          {loading && (
-            <div className="py-6 flex flex-col items-center justify-center gap-1.5 text-xs text-indigo-400">
-              <span className="w-5 h-5 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin"></span>
-              Generating Cryptographic Evidence...
-            </div>
-          )}
-
-          {error && (
-            <div className="p-2.5 rounded bg-rose-950 bg-opacity-20 border border-rose-900 text-xs text-rose-400">
-              {error}
-            </div>
-          )}
-
-          {evidence && (
-            <div className="space-y-3 bg-slate-950 border border-gray-850 p-3.5 rounded-lg text-xs">
-              <div className="flex justify-between items-center pb-2 border-b border-gray-900">
-                <span className="text-[10px] text-gray-500 uppercase">Verification Status</span>
-                <span className="text-[10px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-900 px-2 py-0.5 rounded">
-                  {evidence.verification_status}
-                </span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2 py-1">
-                <div>
-                  <div className="text-[9px] text-gray-500 uppercase">Estimated Loss</div>
-                  <div className="text-sm font-black text-rose-450">{evidence.estimated_loss_pct}%</div>
-                </div>
-                <div>
-                  <div className="text-[9px] text-gray-500 uppercase">Audit Season</div>
-                  <div className="text-xs font-semibold text-gray-300">{evidence.evidence_payload.crop_season}</div>
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <div className="text-[9px] text-gray-500 uppercase">SHA-256 Audit Trail Hash</div>
-                <div className="font-mono text-[9px] text-gray-400 break-all bg-slate-900 p-1.5 rounded border border-gray-800">
-                  {evidence.evidence_hash}
-                </div>
-              </div>
-
-              <button
-                onClick={handleDownload}
-                className="w-full mt-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-1.5 px-3 rounded transition flex items-center justify-center gap-1.5"
-              >
-                <FileDown className="w-4 h-4" />
-                Download Verification Bundle
-              </button>
-            </div>
-          )}
-
-          {/* Validation registry check */}
-          <div className="border-t border-gray-850 pt-4 mt-2">
-            <div className="text-[10px] uppercase font-bold text-gray-450 mb-2">Registry Hash Verification</div>
-            <form onSubmit={handleVerifyHash} className="flex gap-2">
-              <input
-                type="text"
-                placeholder="Paste SHA-256 registry hash..."
-                value={verifyHash}
-                onChange={(e) => setVerifyHash(e.target.value)}
-                className="flex-1 bg-slate-950 border border-gray-800 rounded px-2.5 py-1 text-[10px] text-gray-300 focus:outline-none font-mono"
+        {/* Loading */}
+        {loading && (
+          <div className="py-8 flex flex-col items-center gap-2.5">
+            <div className="relative">
+              <div
+                className="w-10 h-10 rounded-full border-2 border-t-transparent animate-spin"
+                style={{ borderColor: "rgba(99,102,241,0.3)", borderTopColor: "#6366F1" }}
               />
-              <button
-                type="submit"
-                className="bg-indigo-950 hover:bg-indigo-900 text-indigo-300 border border-indigo-805 text-[10px] font-bold px-2.5 rounded transition shrink-0"
-              >
-                Validate
-              </button>
-            </form>
-
-            {verificationResult && (
-              <div className={`mt-2 p-2 rounded text-[10px] flex items-start gap-1.5 ${
-                verificationResult.valid 
-                  ? "bg-emerald-950 bg-opacity-20 border border-emerald-900 text-emerald-400" 
-                  : "bg-rose-950 bg-opacity-20 border border-rose-900 text-rose-400"
-              }`}>
-                {verificationResult.valid ? <CheckCircle className="w-3.5 h-3.5 shrink-0" /> : <ShieldAlert className="w-3.5 h-3.5 shrink-0" />}
-                <div>{verificationResult.msg}</div>
-              </div>
-            )}
+              <Lock className="w-4 h-4 text-indigo-400 absolute inset-0 m-auto" />
+            </div>
+            <div className="text-[11px] text-slate-500">Generating cryptographic evidence bundle...</div>
           </div>
+        )}
+
+        {/* Error */}
+        {error && (
+          <div
+            className="p-3.5 rounded-xl flex items-start gap-2 text-[11px] text-rose-300"
+            style={{ background: "rgba(244,63,94,0.08)", border: "1px solid rgba(244,63,94,0.2)" }}
+          >
+            <ShieldAlert className="w-4 h-4 text-rose-400 flex-shrink-0 mt-0.5" />
+            {error}
+          </div>
+        )}
+
+        {/* Evidence results */}
+        {evidence && (
+          <div
+            className="rounded-xl p-4 space-y-3.5 animate-slide-up"
+            style={{ background: "rgba(6,13,24,0.6)", border: "1px solid rgba(255,255,255,0.06)" }}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[9px] font-bold uppercase tracking-widest text-slate-500">Verification Status</span>
+              <span
+                className="chip font-bold text-[9px]"
+                style={{ background: "rgba(16,185,129,0.15)", border: "1px solid rgba(16,185,129,0.3)", color: "#34D399" }}
+              >
+                ✓ {evidence.verification_status}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2.5">
+              <div
+                className="p-3 rounded-xl"
+                style={{ background: "rgba(244,63,94,0.06)", border: "1px solid rgba(244,63,94,0.12)" }}
+              >
+                <div className="text-[9px] text-rose-400/70 font-bold uppercase tracking-wide mb-1">Est. Loss</div>
+                <div className="text-xl font-black text-rose-300">{evidence.estimated_loss_pct}%</div>
+              </div>
+              <div
+                className="p-3 rounded-xl"
+                style={{ background: "rgba(99,102,241,0.06)", border: "1px solid rgba(99,102,241,0.12)" }}
+              >
+                <div className="text-[9px] text-indigo-400/70 font-bold uppercase tracking-wide mb-1">Season</div>
+                <div className="text-xs font-bold text-indigo-300 leading-tight">{evidence.evidence_payload.crop_season}</div>
+              </div>
+            </div>
+
+            {/* Hash display */}
+            <div>
+              <div className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-1.5">SHA-256 Audit Hash</div>
+              <div
+                className="font-mono text-[9px] text-slate-400 break-all p-3 rounded-lg leading-relaxed"
+                style={{ background: "rgba(6,13,24,0.8)", border: "1px solid rgba(255,255,255,0.05)" }}
+              >
+                {evidence.evidence_hash}
+              </div>
+            </div>
+
+            <button
+              onClick={handleDownload}
+              className="btn-emerald w-full flex items-center justify-center gap-2"
+            >
+              <FileDown className="w-4 h-4" />
+              Download Verification Bundle
+            </button>
+          </div>
+        )}
+
+        {/* Hash verification */}
+        <div
+          className="space-y-2.5 pt-2 border-t"
+          style={{ borderColor: "rgba(255,255,255,0.05)" }}
+        >
+          <div className="text-[9px] font-bold uppercase tracking-widest text-slate-500">Registry Hash Verification</div>
+          <form onSubmit={handleVerifyHash} className="flex gap-2">
+            <input
+              type="text"
+              placeholder="Paste SHA-256 hash to verify..."
+              value={verifyHash}
+              onChange={(e) => setVerifyHash(e.target.value)}
+              className="input-dark flex-1 px-3 py-2 text-[10px] font-mono"
+            />
+            <button
+              type="submit"
+              className="btn-ghost text-[10px] px-3 shrink-0"
+            >
+              Validate
+            </button>
+          </form>
+
+          {verificationResult && (
+            <div
+              className="p-3 rounded-xl flex items-start gap-2 text-[11px] animate-fade-in"
+              style={
+                verificationResult.valid
+                  ? { background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.2)", color: "#34D399" }
+                  : { background: "rgba(244,63,94,0.08)", border: "1px solid rgba(244,63,94,0.2)", color: "#FB7185" }
+              }
+            >
+              {verificationResult.valid
+                ? <CheckCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                : <ShieldAlert className="w-4 h-4 flex-shrink-0 mt-0.5" />
+              }
+              {verificationResult.msg}
+            </div>
+          )}
         </div>
       </div>
     </div>

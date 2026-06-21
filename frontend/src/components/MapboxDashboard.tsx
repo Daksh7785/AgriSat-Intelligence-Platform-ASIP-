@@ -228,19 +228,19 @@ export default function MapboxDashboard({
               <div className="flex flex-col gap-1 text-[10px]">
                 <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-emerald-500 bg-opacity-70"></span> &gt;0.65 (High NDVI/Crop)</div>
                 <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-amber-500 bg-opacity-65"></span> 0.40 - 0.65 (Moderate)</div>
-                <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-red-550 bg-opacity-50"></span> &lt;0.40 (Bare Soil)</div>
+                <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-red-500 bg-opacity-50"></span> &lt;0.40 (Bare Soil)</div>
               </div>
             )}
             {satelliteOverlay === "ndwi" && (
               <div className="flex flex-col gap-1 text-[10px]">
                 <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-blue-500 bg-opacity-80"></span> High Moisture/Water</div>
-                <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-blue-550 bg-opacity-40"></span> Low/Dry Soil</div>
+                <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-blue-500 bg-opacity-40"></span> Low/Dry Soil</div>
               </div>
             )}
             {satelliteOverlay === "sar" && (
               <div className="flex flex-col gap-1 text-[10px]">
                 <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-indigo-500 bg-opacity-80"></span> Polarized Backscatter</div>
-                <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-indigo-550 bg-opacity-40"></span> Lower Backscatter</div>
+                <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-indigo-500 bg-opacity-40"></span> Lower Backscatter</div>
               </div>
             )}
           </div>

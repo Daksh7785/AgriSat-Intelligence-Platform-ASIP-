@@ -1,6 +1,6 @@
 "use client";
 
-import { Droplets, Activity, Percent, ArrowDown } from "lucide-react";
+import { Droplets, Activity, Percent, ArrowRight, Waves } from "lucide-react";
 
 interface CanalCommandTwinProps {
   summary: any;
@@ -8,103 +8,188 @@ interface CanalCommandTwinProps {
 }
 
 export default function CanalCommandTwin({ summary, fieldsGeojson }: CanalCommandTwinProps) {
-  // Compute priority list based on moisture stress scores of fields
   const fields = fieldsGeojson?.features || [];
   const priorityFields = [...fields]
     .filter((f: any) => f.properties.stress_score > 0.15)
     .sort((a: any, b: any) => b.properties.stress_score - a.properties.stress_score);
 
-  // Compute Reservoir Stats
-  const reservoirCapacity = 500000; // Acre-feet
-  const reservoirStorage = 385420;  // Current Storage Acre-feet
+  const reservoirCapacity = 500000;
+  const reservoirStorage = 385420;
   const storagePercentage = (reservoirStorage / reservoirCapacity) * 100;
-  
+  const canalFlow = summary?.active_command_canal_flow_cusec || 1250;
+  const canalUtilization = (canalFlow / 1500) * 100;
+
   return (
-    <div className="p-5 rounded-xl border border-gray-800 glass-panel h-full">
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="font-bold text-gray-100 flex items-center gap-2">
-          <Activity className="w-5 h-5 text-sky-400" />
-          Digital Twin Command Simulation
-        </h3>
-        <span className="text-[10px] uppercase font-bold text-sky-400 bg-sky-950 px-2 py-0.5 rounded border border-sky-800">
-          Live Flow Network
+    <div
+      className="rounded-2xl flex flex-col"
+      style={{
+        background: "linear-gradient(135deg, rgba(15,32,64,0.9) 0%, rgba(10,22,40,0.85) 100%)",
+        border: "1px solid rgba(255,255,255,0.07)",
+        boxShadow: "0 4px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05)",
+      }}
+    >
+      {/* Header */}
+      <div
+        className="px-5 py-4 flex items-center justify-between flex-shrink-0"
+        style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}
+      >
+        <div className="flex items-center gap-2.5">
+          <div
+            className="w-8 h-8 rounded-xl flex items-center justify-center"
+            style={{
+              background: "linear-gradient(135deg, rgba(56,189,248,0.2), rgba(14,165,233,0.15))",
+              border: "1px solid rgba(56,189,248,0.3)",
+            }}
+          >
+            <Activity className="w-4 h-4 text-sky-400" />
+          </div>
+          <div>
+            <div className="text-sm font-bold text-white leading-none">Digital Canal Twin</div>
+            <div className="text-[9px] text-slate-500 mt-0.5">Sirhind Command Network Simulation</div>
+          </div>
+        </div>
+        <span
+          className="flex items-center gap-1.5 text-[9px] font-bold px-2 py-1 rounded-lg"
+          style={{ background: "rgba(56,189,248,0.1)", border: "1px solid rgba(56,189,248,0.25)", color: "#38BDF8" }}
+        >
+          <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse" />
+          LIVE
         </span>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-        {/* Reservoir Status */}
-        <div className="p-4 rounded-lg bg-slate-900 border border-gray-800 relative overflow-hidden flex flex-col justify-between min-h-[140px]">
-          {/* Animated Water Wave background */}
-          <div className="absolute inset-x-0 bottom-0 bg-blue-950 bg-opacity-20 h-1/2 overflow-hidden pointer-events-none">
-            <div className="w-[200%] h-[200%] bg-sky-900 opacity-20 rounded-[40%] absolute -bottom-1/2 -left-1/2 animate-spin duration-[15s]" />
+      <div className="p-4 space-y-4 flex-1">
+        {/* Reservoir + Canal cards */}
+        <div className="grid grid-cols-2 gap-3">
+          {/* Reservoir */}
+          <div
+            className="relative rounded-xl p-4 overflow-hidden flex flex-col justify-between"
+            style={{ background: "rgba(6,13,24,0.7)", border: "1px solid rgba(56,189,248,0.15)", minHeight: "130px" }}
+          >
+            {/* Water level visual */}
+            <div
+              className="absolute inset-x-0 bottom-0 rounded-b-xl pointer-events-none transition-all"
+              style={{
+                height: `${storagePercentage}%`,
+                background: "linear-gradient(180deg, rgba(14,165,233,0.12) 0%, rgba(2,132,199,0.06) 100%)",
+              }}
+            />
+            {/* Animated wave */}
+            <div
+              className="absolute left-0 right-0 h-1 pointer-events-none"
+              style={{
+                bottom: `${storagePercentage}%`,
+                background: "linear-gradient(90deg, transparent, rgba(56,189,248,0.5), transparent)",
+                animation: "shimmer 3s ease-in-out infinite",
+                backgroundSize: "200% 100%",
+              }}
+            />
+            <div className="relative z-10">
+              <div className="text-[9px] font-bold uppercase tracking-widest text-sky-400/60 mb-1">
+                Bhakra Reservoir
+              </div>
+              <div className="text-xl font-black text-sky-300">
+                {(reservoirStorage / 1000).toFixed(0)}k AF
+              </div>
+              <div className="text-[9px] text-slate-600 mt-0.5">
+                of {(reservoirCapacity / 1000).toFixed(0)}k AF capacity
+              </div>
+            </div>
+            <div className="relative z-10 mt-3">
+              <div className="flex justify-between text-[9px] text-slate-500 mb-1">
+                <span>Storage Level</span>
+                <span className="text-sky-400 font-bold">{storagePercentage.toFixed(1)}%</span>
+              </div>
+              <div className="progress-track">
+                <div className="progress-fill-indigo" style={{ width: `${storagePercentage}%` }} />
+              </div>
+            </div>
           </div>
-          
-          <div className="relative z-10">
-            <div className="text-xs text-gray-400 uppercase font-semibold">Bhakra Reservoir Level</div>
-            <div className="text-2xl font-black mt-1 text-sky-400">{reservoirStorage.toLocaleString()} AF</div>
-            <div className="text-[10px] text-gray-500 mt-0.5">Capacity: {reservoirCapacity.toLocaleString()} AF</div>
-          </div>
-          
-          <div className="relative z-10 flex items-center justify-between border-t border-gray-800 pt-2 mt-4">
-            <span className="text-[11px] text-gray-400 flex items-center gap-1">
-              <Percent className="w-3.5 h-3.5 text-sky-400" /> Storage Capacity
-            </span>
-            <span className="font-bold text-xs text-sky-300">{storagePercentage.toFixed(1)}%</span>
+
+          {/* Canal Flow */}
+          <div
+            className="rounded-xl p-4 flex flex-col justify-between"
+            style={{ background: "rgba(6,13,24,0.7)", border: "1px solid rgba(16,185,129,0.15)", minHeight: "130px" }}
+          >
+            <div>
+              <div className="text-[9px] font-bold uppercase tracking-widest text-emerald-400/60 mb-1">
+                Canal Intake Flow
+              </div>
+              <div className="text-xl font-black text-emerald-300">
+                {canalFlow.toLocaleString()} <span className="text-sm font-normal text-emerald-400/60">cusec</span>
+              </div>
+              <div className="text-[9px] text-slate-600 mt-0.5">Capacity: 1,500 cusec</div>
+            </div>
+            <div className="mt-3">
+              <div className="flex justify-between text-[9px] text-slate-500 mb-1">
+                <span>Utilization</span>
+                <span className="text-emerald-400 font-bold">{canalUtilization.toFixed(0)}%</span>
+              </div>
+              <div className="progress-track">
+                <div className="progress-fill-emerald" style={{ width: `${canalUtilization}%` }} />
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Total Irrigation Outflow */}
-        <div className="p-4 rounded-lg bg-slate-900 border border-gray-800 flex flex-col justify-between min-h-[140px]">
-          <div>
-            <div className="text-xs text-gray-400 uppercase font-semibold">Canal Command Flow Rate</div>
-            <div className="text-2xl font-black mt-1 text-emerald-400">
-              {summary?.active_command_canal_flow_cusec || 1250} cusec
-            </div>
-            <div className="text-[10px] text-gray-500 mt-0.5">Assigned Capacity: 1,500 cusec</div>
+        {/* Priority zones */}
+        <div>
+          <div
+            className="section-header mb-3"
+            style={{ fontSize: "9px", letterSpacing: "0.1em" }}
+          >
+            <Waves className="w-3 h-3 text-sky-400" />
+            Canal Delivery Priority Zones
           </div>
 
-          <div className="flex items-center justify-between border-t border-gray-800 pt-2 mt-4">
-            <span className="text-[11px] text-gray-400 flex items-center gap-1">
-              <Droplets className="w-3.5 h-3.5 text-emerald-400" /> Active Canal Delivery
-            </span>
-            <span className="font-bold text-xs text-emerald-300">
-              {((summary?.active_command_canal_flow_cusec || 1250) / 1500 * 100).toFixed(0)}% Utilized
-            </span>
+          <div className="space-y-2 max-h-[170px] overflow-y-auto pr-0.5">
+            {priorityFields.length === 0 ? (
+              <div className="text-center text-[11px] text-slate-600 py-6 flex flex-col items-center gap-2">
+                <Droplets className="w-6 h-6 text-emerald-400/20" />
+                All zones saturated — normal flow operations
+              </div>
+            ) : (
+              priorityFields.map((f: any, idx: number) => {
+                const isImmediate = f.properties.stress_score > 0.6;
+                return (
+                  <div
+                    key={idx}
+                    className="flex items-center justify-between p-3 rounded-xl transition-all duration-200"
+                    style={
+                      isImmediate
+                        ? { background: "rgba(244,63,94,0.06)", border: "1px solid rgba(244,63,94,0.15)" }
+                        : { background: "rgba(6,13,24,0.5)", border: "1px solid rgba(255,255,255,0.05)" }
+                    }
+                  >
+                    <div>
+                      <div className="text-[11px] font-semibold text-slate-200">{f.properties.name}</div>
+                      <div className="text-[9px] text-slate-600 capitalize">{f.properties.village} · {f.properties.crop_type}</div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="text-right">
+                        <div className="text-[9px] text-slate-500">Stress</div>
+                        <div
+                          className="text-[11px] font-black"
+                          style={{ color: isImmediate ? "#FB7185" : "#FCD34D" }}
+                        >
+                          {(f.properties.stress_score * 100).toFixed(0)}%
+                        </div>
+                      </div>
+                      <span
+                        className="chip text-[9px] font-bold"
+                        style={
+                          isImmediate
+                            ? { background: "rgba(244,63,94,0.15)", border: "1px solid rgba(244,63,94,0.3)", color: "#FB7185" }
+                            : { background: "rgba(245,158,11,0.15)", border: "1px solid rgba(245,158,11,0.3)", color: "#FCD34D" }
+                        }
+                      >
+                        {isImmediate ? "🚨 Now" : "⏳ Soon"}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
-        </div>
-      </div>
-
-      {/* Irrigation Priority Zones */}
-      <div>
-        <h4 className="text-xs font-semibold text-gray-400 uppercase mb-2">Canal Delivery Priority Zones</h4>
-        <div className="space-y-2 max-h-[160px] overflow-y-auto pr-1">
-          {priorityFields.length === 0 ? (
-            <div className="text-center text-xs text-gray-500 py-6">
-              All zones saturated. Normal flow operations.
-            </div>
-          ) : (
-            priorityFields.map((f: any, idx: number) => {
-              const priority = f.properties.stress_score > 0.6 ? "Immediate" : "Medium";
-              return (
-                <div key={idx} className="flex justify-between items-center p-2 rounded bg-slate-900 bg-opacity-50 border border-gray-800 hover:border-gray-700 transition">
-                  <div className="text-xs">
-                    <div className="font-semibold text-gray-200">{f.properties.name}</div>
-                    <div className="text-[10px] text-gray-500">Village: {f.properties.village}</div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-[10px] text-gray-400 capitalize">{f.properties.crop_type}</span>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                      priority === "Immediate" 
-                        ? "bg-rose-950 text-rose-400 border border-rose-800" 
-                        : "bg-amber-950 text-amber-400 border border-amber-800"
-                    }`}>
-                      {priority}
-                    </span>
-                  </div>
-                </div>
-              );
-            })
-          )}
         </div>
       </div>
     </div>
