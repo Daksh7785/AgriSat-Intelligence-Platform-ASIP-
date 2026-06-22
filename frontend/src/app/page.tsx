@@ -39,6 +39,12 @@ import AlertManager from "../components/AlertManager";
 import AICopilotPanel from "../components/AICopilotPanel";
 import CropSuitability from "../components/CropSuitability";
 import InsuranceAuditor from "../components/InsuranceAuditor";
+import ISROComplianceDashboard from "../components/ISROComplianceDashboard";
+import TemporalSignatureExplorer from "../components/TemporalSignatureExplorer";
+import WaterDeficitPanel from "../components/WaterDeficitPanel";
+import ValidationMetrics from "../components/ValidationMetrics";
+import SatelliteIndicesPanel from "../components/SatelliteIndicesPanel";
+import PhenologyStagePanel from "../components/PhenologyStagePanel";
 
 const MapboxDashboard = dynamic(
   () => import("../components/MapboxDashboard"),
@@ -803,6 +809,52 @@ export default function DashboardPage() {
         <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <CropSuitability locationInfo={activeLocationInfo} />
           <InsuranceAuditor selectedField={selectedField} />
+        </section>
+
+        {/* ── ROW 5: PS-6 SATELLITE INTELLIGENCE ───────────────────── */}
+        <section>
+          <div className="flex items-center gap-2.5 mb-4">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl"
+              style={{ background: "rgba(99,102,241,0.1)", border: "1px solid rgba(99,102,241,0.2)" }}>
+              <Satellite className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />
+              <span className="text-[10px] font-black text-indigo-300 uppercase tracking-widest">PS-6 Satellite Intelligence Suite</span>
+            </div>
+            <div className="flex-1 h-px" style={{ background: "linear-gradient(90deg, rgba(99,102,241,0.3), transparent)" }} />
+          </div>
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            <div className="xl:col-span-1">
+              <SatelliteIndicesPanel selectedField={selectedField} />
+            </div>
+            <div className="xl:col-span-1">
+              <PhenologyStagePanel selectedField={selectedField} />
+            </div>
+            <div className="xl:col-span-1">
+              <WaterDeficitPanel selectedField={selectedField} />
+            </div>
+          </div>
+        </section>
+
+        {/* ── ROW 6: TEMPORAL EXPLORER + VALIDATION ────────────────── */}
+        <section className="grid grid-cols-1 xl:grid-cols-5 gap-6">
+          <div className="xl:col-span-3">
+            <TemporalSignatureExplorer />
+          </div>
+          <div className="xl:col-span-2">
+            <ValidationMetrics />
+          </div>
+        </section>
+
+        {/* ── ROW 7: ISRO COMPLIANCE DASHBOARD ─────────────────────── */}
+        <section>
+          <div className="flex items-center gap-2.5 mb-4">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl"
+              style={{ background: "rgba(52,211,153,0.08)", border: "1px solid rgba(52,211,153,0.2)" }}>
+              <Award className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="text-[10px] font-black text-emerald-300 uppercase tracking-widest">ISRO PS-6 Compliance Dashboard</span>
+            </div>
+            <div className="flex-1 h-px" style={{ background: "linear-gradient(90deg, rgba(52,211,153,0.3), transparent)" }} />
+          </div>
+          <ISROComplianceDashboard fieldsGeojson={fieldsGeojson} />
         </section>
       </main>
 

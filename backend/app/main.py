@@ -28,7 +28,14 @@ from app.api.v1 import (
     data_quality,
     tiles,
     suitability,
-    insurance
+    insurance,
+    water_deficit,
+    vci_smi,
+    sar_features,
+    validation,
+    temporal_classification,
+    satellite_connectors,
+    canal_water,
 )
 
 app = FastAPI(
@@ -77,6 +84,14 @@ app.include_router(data_quality.router, prefix=settings.API_V1_STR)
 app.include_router(tiles.router, prefix=settings.API_V1_STR)
 app.include_router(suitability.router, prefix=settings.API_V1_STR)
 app.include_router(insurance.router, prefix=settings.API_V1_STR)
+app.include_router(water_deficit.router, prefix=settings.API_V1_STR)
+app.include_router(vci_smi.router, prefix=settings.API_V1_STR)
+app.include_router(sar_features.router, prefix=settings.API_V1_STR)
+app.include_router(validation.router, prefix=settings.API_V1_STR)
+app.include_router(temporal_classification.router, prefix=settings.API_V1_STR)
+app.include_router(satellite_connectors.router, prefix=settings.API_V1_STR)
+app.include_router(canal_water.router, prefix=settings.API_V1_STR)
+app.include_router(canal_water.calendar_router, prefix=settings.API_V1_STR)
 
 
 @app.on_event("startup")

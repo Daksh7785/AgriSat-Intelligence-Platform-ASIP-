@@ -1,0 +1,145 @@
+services:
+  # Managed Redis for Celery Broker and Cache
+  - type: redis
+    name: agrisense-redis
+    plan: free
+    ipAllowList: [] # Internal access only
+
+  # FastAPI Web Service
+  - type: web
+    name: agrisense-backend
+    env: docker
+    rootDir: backend
+    plan: free
+    # Render maps the $PORT automatically, we just need to ensure uvicorn binds to it
+    dockerCommand: "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: POSTGRES_HOST
+        fromDatabase:
+          name: agrisense-db
+          property: host
+      - key: POSTGRES_PORT
+        fromDatabase:
+          name: agrisense-db
+          property: port
+      - key: POSTGRES_USER
+        fromDatabase:
+          name: agrisense-db
+          property: user
+      - key: POSTGRES_PASSWORD
+        fromDatabase:
+          name: agrisense-db
+          property: password
+      - key: POSTGRES_DB
+        fromDatabase:
+          name: agrisense-db
+          property: database
+      - key: REDIS_HOST
+        fromService:
+          type: redis
+          name: agrisense-redis
+          property: host
+      - key: REDIS_PORT
+        fromService:
+          type: redis
+          name: agrisense-redis
+          property: port
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEMO_MODE
+        value: "True"
+
+  # Celery Background Worker
+  - type: worker
+    name: agrisense-celery-worker
+    env: docker
+    rootDir: backend
+    plan: free
+    dockerCommand: "celery -A app.tasks.celery_app.celery_app worker --loglevel=info"
+    envVars:
+      - key: POSTGRES_HOST
+        fromDatabase:
+          name: agrisense-db
+          property: host
+      - key: POSTGRES_PORT
+        fromDatabase:
+          name: agrisense-db
+          property: port
+      - key: POSTGRES_USER
+        fromDatabase:
+          name: agrisense-db
+          property: user
+      - key: POSTGRES_PASSWORD
+        fromDatabase:
+          name: agrisense-db
+          property: password
+      - key: POSTGRES_DB
+        fromDatabase:
+          name: agrisense-db
+          property: database
+      - key: REDIS_HOST
+        fromService:
+          type: redis
+          name: agrisense-redis
+          property: host
+      - key: REDIS_PORT
+        fromService:
+          type: redis
+          name: agrisense-redis
+          property: port
+      - key: SECRET_KEY
+        fromService:
+          type: web
+          name: agrisense-backend
+          envVarKey: SECRET_KEY
+
+  # Celery Beat (Scheduled Tasks)
+  - type: worker
+    name: agrisense-celery-beat
+    env: docker
+    rootDir: backend
+    plan: free
+    dockerCommand: "celery -A app.tasks.celery_app.celery_app beat --loglevel=info"
+    envVars:
+      - key: POSTGRES_HOST
+        fromDatabase:
+          name: agrisense-db
+          property: host
+      - key: POSTGRES_PORT
+        fromDatabase:
+          name: agrisense-db
+          property: port
+      - key: POSTGRES_USER
+        fromDatabase:
+          name: agrisense-db
+          property: user
+      - key: POSTGRES_PASSWORD
+        fromDatabase:
+          name: agrisense-db
+          property: password
+      - key: POSTGRES_DB
+        fromDatabase:
+          name: agrisense-db
+          property: database
+      - key: REDIS_HOST
+        fromService:
+          type: redis
+          name: agrisense-redis
+          property: host
+      - key: REDIS_PORT
+        fromService:
+          type: redis
+          name: agrisense-redis
+          property: port
+      - key: SECRET_KEY
+        fromService:
+          type: web
+          name: agrisense-backend
+          envVarKey: SECRET_KEY
+
+databases:
+  # Managed PostgreSQL Database
+  - name: agrisense-db
+    databaseName: agrisense
+    user: agrisense_user
+    plan: free
