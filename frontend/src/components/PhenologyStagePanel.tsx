@@ -131,7 +131,6 @@ export default function PhenologyStagePanel({ selectedField }: PhenologyStagePan
                               background: isActive ? `${s.color}25` : isPast ? `${s.color}12` : "rgba(6,13,24,0.8)",
                               border: `2px solid ${isActive ? s.color : isPast ? s.color + "60" : "rgba(255,255,255,0.08)"}`,
                               boxShadow: isActive ? `0 0 12px ${s.color}40` : "none",
-                              ringColor: s.color,
                             }}>
                             <span className={`text-sm leading-none ${!isPast && !isActive ? "opacity-30" : ""}`}>{s.icon}</span>
                           </div>
